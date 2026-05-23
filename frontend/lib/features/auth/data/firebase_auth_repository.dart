@@ -16,7 +16,11 @@ class FirebaseAuthRepository implements AuthRepository {
   AuthUser? get currentUser {
     final user = _firebaseAuth.currentUser;
     if (user == null) return null;
-    return AuthUser(uid: user.uid, email: user.email);
+    return AuthUser(
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+    );
   }
 
   @override
@@ -32,7 +36,11 @@ class FirebaseAuthRepository implements AuthRepository {
         message: 'Gagal masuk. Coba lagi.',
       );
     }
-    return AuthUser(uid: user.uid, email: user.email);
+    return AuthUser(
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+    );
   }
 
   @override
@@ -48,7 +56,11 @@ class FirebaseAuthRepository implements AuthRepository {
         message: 'Pendaftaran gagal. Coba lagi.',
       );
     }
-    return AuthUser(uid: user.uid, email: user.email);
+    return AuthUser(
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+    );
   }
 
   @override
@@ -76,7 +88,11 @@ class FirebaseAuthRepository implements AuthRepository {
       );
     }
 
-    return AuthUser(uid: user.uid, email: user.email);
+    return AuthUser(
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+    );
   }
 
   @override

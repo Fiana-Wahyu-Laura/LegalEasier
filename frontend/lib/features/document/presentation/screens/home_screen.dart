@@ -73,8 +73,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final authUser = ref.watch(authNotifierProvider).value;
-    final userEmail = authUser?.email ?? 'Pengguna';
-    final userInitial = userEmail.isNotEmpty ? userEmail[0].toUpperCase() : 'U';
+    final displayName = authUser?.displayName?.trim();
+    final userName = (displayName != null && displayName.isNotEmpty)
+        ? displayName
+        : (authUser?.email ?? 'Pengguna');
+    final userInitial = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
 
     return Scaffold(
       backgroundColor: AppColors.pageBackground,
@@ -125,7 +128,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Selamat datang, $userEmail',
+                'Selamat datang, $userName',
                 style: AppTextStyles.bodyLarge,
               ),
               const SizedBox(height: 16),

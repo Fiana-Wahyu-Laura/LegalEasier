@@ -48,7 +48,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final authUser = ref.watch(authNotifierProvider).value;
-    final userEmail = authUser?.email ?? 'Pengguna';
+    final displayName = authUser?.displayName?.trim();
+    final userName = (displayName != null && displayName.isNotEmpty)
+        ? displayName
+        : (authUser?.email ?? 'Pengguna');
 
     return Scaffold(
       appBar: AppBar(
@@ -80,7 +83,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Selamat datang, $userEmail',
+              'Selamat datang, $userName',
               style: const TextStyle(fontSize: 16, color: Colors.black54),
             ),
             const SizedBox(height: 24),
