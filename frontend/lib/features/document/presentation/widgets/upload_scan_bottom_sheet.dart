@@ -239,7 +239,7 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
       }
 
       await _uploadFile(File(photo.path));
-    } on Exception catch (error) {
+    } on Exception {
       if (!mounted) return;
       messenger.showSnackBar(
         const SnackBar(content: Text('Gagal membuka kamera. Coba lagi.')),
@@ -263,7 +263,7 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
       }
 
       await _uploadFile(File(path));
-    } on Exception catch (error) {
+    } on Exception {
       if (!mounted) return;
       messenger.showSnackBar(
         const SnackBar(content: Text('Gagal memilih file. Coba lagi.')),
@@ -291,7 +291,7 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
 
       if (!mounted) return;
       Navigator.of(context).pop(uploadedDocument);
-    } on Exception catch (error) {
+    } on Exception {
       if (!mounted) return;
       messenger.showSnackBar(
         const SnackBar(content: Text('Upload gagal. Silakan coba lagi.')),

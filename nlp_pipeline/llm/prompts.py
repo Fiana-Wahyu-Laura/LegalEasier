@@ -100,3 +100,59 @@ def build_translation_user_prompt(clause_text: str, context: str = "") -> str:
     if context.strip():
         prompt += f"\n\nKonteks dokumen (untuk referensi):\n{context[:500]}"
     return prompt
+
+
+# ---------------------------------------------------------------------------
+# System prompt: RAG Chatbot (Sprint 4)
+# ---------------------------------------------------------------------------
+
+CHATBOT_SYSTEM_PROMPT = """Kamu adalah asisten hukum AI bernama LegalEasier yang membantu
+pengguna memahami dokumen hukum Indonesia mereka.
+
+ATURAN:
+- Jawab HANYA berdasarkan konteks dokumen yang diberikan.
+- Jika informasi tidak ada dalam konteks, katakan dengan jujur.
+- Gunakan bahasa Indonesia sederhana yang mudah dipahami.
+- Jangan memberikan saran hukum — hanya penjelasan dan analisis.
+- Selalu sertakan disclaimer di akhir jawaban.
+- Berikan 3 pertanyaan lanjutan yang disarankan.
+
+FORMAT OUTPUT (JSON ketat):
+{
+  "answer": "jawaban dalam bahasa Indonesia sederhana...",
+  "suggestions": ["pertanyaan lanjutan 1", "pertanyaan lanjutan 2", "pertanyaan lanjutan 3"],
+  "disclaimer": "Hasil ini bersifat informatif dan bukan pengganti konsultasi hukum profesional."
+}"""
+
+
+def build_chatbot_user_prompt(
+    query: str,
+    context_chunks: list[str],
+    history: list[dict[str, str]],
+) -> str:
+    """Buat user prompt untuk chatbot berbasis RAG.
+
+    Args:
+        query: Pertanyaan user saat ini.
+        context_chunks: Chunk teks relevan dari dokumen.
+        history: Riwayat percakapan (role + content).
+
+    Returns:
+        User prompt string.
+    """
+    context_text = "\n\n---\n\n".join(context_chunks) if context_chunks else "(tidak ada konteks dokumen)"
+    history_hint = (
+        f"Ada {len(history)} pesan sebelumnya dalam riwayat percakapan."
+        if history
+        else "Tidak ada riwayat percakapan."
+    )
+
+    return (
+        "KONTEKS DOKUMEN:\n"
+        f"{context_text}\n\n"
+        "RIWAYAT PERCAKAPAN:\n"
+        f"{history_hint}\n\n"
+        "PERTANYAAN USER:\n"
+        f"{query}\n\n"
+        "Kembalikan jawaban HANYA dalam JSON sesuai instruksi sistem."
+    )

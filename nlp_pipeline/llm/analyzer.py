@@ -28,7 +28,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Literal
 
-from core.config import settings
+from llm._client import call_llm
 from llm.prompts import (
     DISCLAIMER,
     RISK_ANALYSIS_SYSTEM_PROMPT,
@@ -62,126 +62,6 @@ class AnalysisResult:
     risk_clauses: list[RiskClause] = field(default_factory=list)
     summary: str = ""
     disclaimer: str = DISCLAIMER
-
-
-# ---------------------------------------------------------------------------
-# LLM client helpers
-# ---------------------------------------------------------------------------
-
-
-def _call_claude(system_prompt: str, user_prompt: str) -> str:
-    """Panggil Claude API (primary LLM).
-
-    Args:
-        system_prompt: System prompt untuk Claude.
-        user_prompt: User prompt (berisi dokumen context).
-
-    Returns:
-        Response text dari Claude.
-
-    Raises:
-        RuntimeError: Jika API call gagal.
-    """
-    try:
-        import anthropic
-    except ImportError as exc:
-        raise RuntimeError(
-            "Package 'anthropic' belum terinstall. Jalankan: pip install anthropic"
-        ) from exc
-
-    if not settings.claude_api_key:
-        raise RuntimeError("CLAUDE_API_KEY belum di-set di .env.")
-
-    client = anthropic.Anthropic(api_key=settings.claude_api_key)
-
-    try:
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4096,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
-        return message.content[0].text
-    except anthropic.APIError as exc:
-        raise RuntimeError(f"Claude API error: {exc}") from exc
-
-
-def _call_nim(system_prompt: str, user_prompt: str) -> str:
-    """Panggil NVIDIA NIM API (fallback LLM, OpenAI-compatible).
-
-    Args:
-        system_prompt: System prompt.
-        user_prompt: User prompt.
-
-    Returns:
-        Response text dari NIM.
-
-    Raises:
-        RuntimeError: Jika API call gagal.
-    """
-    try:
-        import openai
-    except ImportError as exc:
-        raise RuntimeError(
-            "Package 'openai' belum terinstall. Jalankan: pip install openai"
-        ) from exc
-
-    if not settings.nim_api_key:
-        raise RuntimeError("NIM_API_KEY belum di-set di .env.")
-
-    client = openai.OpenAI(
-        api_key=settings.nim_api_key,
-        base_url=settings.nim_base_url,
-    )
-
-    try:
-        response = client.chat.completions.create(
-            model=settings.nim_model,
-            max_tokens=4096,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        )
-        return response.choices[0].message.content or ""
-    except openai.APIError as exc:
-        raise RuntimeError(f"NIM API error: {exc}") from exc
-
-
-def _call_llm(system_prompt: str, user_prompt: str) -> str:
-    """Panggil LLM dengan fallback: Claude → NVIDIA NIM.
-
-    Args:
-        system_prompt: System prompt.
-        user_prompt: User prompt.
-
-    Returns:
-        Response text dari LLM.
-
-    Raises:
-        RuntimeError: Jika semua LLM gagal.
-    """
-    # Try Claude first (primary)
-    if settings.claude_api_key:
-        try:
-            logger.info("Memanggil Claude API (primary)...")
-            return _call_claude(system_prompt, user_prompt)
-        except RuntimeError as exc:
-            logger.warning("Claude API gagal: %s. Mencoba fallback NVIDIA NIM...", exc)
-
-    # Fallback to NVIDIA NIM (OpenAI-compatible)
-    if settings.nim_api_key:
-        try:
-            logger.info("Memanggil NVIDIA NIM (fallback)...")
-            return _call_nim(system_prompt, user_prompt)
-        except RuntimeError as exc:
-            logger.error("NIM fallback juga gagal: %s", exc)
-            raise
-
-    raise RuntimeError(
-        "Tidak ada LLM API key yang tersedia. "
-        "Set CLAUDE_API_KEY atau NIM_API_KEY di .env."
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -361,7 +241,7 @@ def analyze_document(
                 "[%s] LLM analysis attempt %d/%d...",
                 document_id, attempt, max_attempts,
             )
-            raw_response = _call_llm(RISK_ANALYSIS_SYSTEM_PROMPT, user_prompt)
+            raw_response = call_llm(RISK_ANALYSIS_SYSTEM_PROMPT, user_prompt)
             result = _parse_analysis_response(raw_response)
 
             logger.info(

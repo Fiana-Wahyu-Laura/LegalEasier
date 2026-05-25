@@ -45,8 +45,11 @@ from rag.embedder import embed_chunks
 from rag.retriever import retrieve_all_chunks, retrieve_relevant_chunks
 from rag.vector_store import delete_document_collection, get_collection_info, store_chunks
 from llm.analyzer import analyze_document
+from llm.chatbot import chat_with_document
 from llm.risk_scorer import compute_risk_score
 from schemas import (
+    ChatRequest,
+    ChatResponse,
     EmbedStoreResult,
     HealthResponse,
     OCRResponse,
@@ -531,6 +534,50 @@ async def nlp_retrieve(request: RetrieveRequest) -> StandardResponse:
         success=True,
         data=response_data.model_dump(),
         message=f"Ditemukan {result.found_count} chunk relevan untuk query.",
+    )
+
+
+@app.post(
+    "/nlp/chat",
+    response_model=ChatResponse,
+    summary="RAG Chatbot — Tanya Jawab Dokumen",
+    tags=["Chatbot"],
+    status_code=status.HTTP_200_OK,
+)
+async def nlp_chat(request: ChatRequest) -> ChatResponse:
+    """
+    RAG chatbot untuk tanya jawab tentang dokumen hukum (Sprint 4).
+
+    Flow:
+    1. Retrieve chunk relevan dari ChromaDB berdasarkan query user
+    2. Kirim context + history + query ke LLM (Claude/NIM)
+    3. Return jawaban + suggestion chips
+
+    Stateless: backend mengirim history di setiap request.
+    """
+    document_id = request.document_id.strip()
+    query = request.query.strip()
+
+    try:
+        result = chat_with_document(
+            document_id=document_id,
+            query=query,
+            history=[m.model_dump() for m in request.history],
+            top_k=request.top_k,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    return ChatResponse(
+        document_id=document_id,
+        query=query,
+        answer=result.answer,
+        context_chunks_used=result.context_chunks_used,
+        suggestions=result.suggestions,
+        disclaimer=result.disclaimer,
     )
 
 

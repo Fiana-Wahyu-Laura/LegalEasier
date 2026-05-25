@@ -13,6 +13,7 @@ Sprint 4:
 """
 
 from llm.analyzer import AnalysisResult, RiskClause, analyze_document
+from llm.chatbot import ChatResult, chat_with_document
 from llm.risk_scorer import compute_risk_score
 from llm.translator import translate_clause, translate_clauses_batch
 
@@ -20,6 +21,8 @@ __all__ = [
     "AnalysisResult",
     "RiskClause",
     "analyze_document",
+    "ChatResult",
+    "chat_with_document",
     "compute_risk_score",
     "translate_clause",
     "translate_clauses_batch",
