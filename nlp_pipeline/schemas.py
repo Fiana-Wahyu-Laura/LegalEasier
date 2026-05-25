@@ -16,6 +16,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ConfigDict
 
+from llm.prompts import DISCLAIMER
+
 
 # ---------------------------------------------------------------------------
 # Standard response wrapper (CLAUDE.md §8)
@@ -230,3 +232,46 @@ class RetrieveResponse(BaseModel):
     chunks: list[str] = Field(description="Chunk yang relevan, urut dari paling relevan.")
     similarities: list[float] = Field(description="Similarity score tiap chunk (0.0–1.0).")
     found_count: int
+
+
+# ---------------------------------------------------------------------------
+# Chatbot Schemas (Sprint 4)
+# ---------------------------------------------------------------------------
+
+
+class ChatMessage(BaseModel):
+    """Satu pesan dalam conversation history."""
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, description="Isi pesan.")
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ChatRequest(BaseModel):
+    """Request untuk POST /nlp/chat."""
+
+    document_id: str = Field(min_length=1, description="UUID dokumen yang dibahas.")
+    query: str = Field(min_length=1, description="Pertanyaan user saat ini.")
+    history: list[ChatMessage] = Field(
+        default_factory=list,
+        description="Conversation history (max 20 pesan terakhir).",
+        max_length=20,
+    )
+    top_k: int = Field(default=5, ge=1, le=10, description="Jumlah chunk konteks.")
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ChatResponse(BaseModel):
+    """Response untuk POST /nlp/chat."""
+
+    document_id: str
+    query: str
+    answer: str = Field(description="Jawaban chatbot dalam bahasa Indonesia.")
+    context_chunks_used: int = Field(description="Jumlah chunk konteks yang digunakan.")
+    suggestions: list[str] = Field(
+        default_factory=list,
+        description="3 pertanyaan lanjutan yang disarankan.",
+    )
+    disclaimer: str = Field(default=DISCLAIMER)

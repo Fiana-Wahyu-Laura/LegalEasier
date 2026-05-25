@@ -53,8 +53,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
+        const SnackBar(
+          content: Text(
             'Gagal keluar. Silakan coba lagi.',
             style: TextStyle(color: Colors.white),
           ),

@@ -228,8 +228,8 @@ class TestOcrExtractEndpoint:
         assert response.status_code == 422
 
     def test_oversized_file_returns_413(self) -> None:
-        """File melebihi 20MB harus mengembalikan 413."""
-        large_file = io.BytesIO(b"x" * (21 * 1024 * 1024))  # 21MB
+        """File melebihi 25MB harus mengembalikan 413."""
+        large_file = io.BytesIO(b"x" * (26 * 1024 * 1024))  # 26MB
         response = client.post(
             "/ocr/extract",
             files={"file": ("besar.pdf", large_file, "application/pdf")},

@@ -20,7 +20,7 @@ Aturan kode:
 
 import logging
 
-from llm.analyzer import _call_llm
+from llm._client import call_llm
 from llm.prompts import (
     TRANSLATION_SYSTEM_PROMPT,
     build_translation_user_prompt,
@@ -50,7 +50,7 @@ def translate_clause(clause_text: str, context: str = "") -> str:
     user_prompt = build_translation_user_prompt(clause_text, context)
 
     try:
-        result = _call_llm(TRANSLATION_SYSTEM_PROMPT, user_prompt)
+        result = call_llm(TRANSLATION_SYSTEM_PROMPT, user_prompt)
         return result.strip()
     except RuntimeError as exc:
         logger.error("Gagal menerjemahkan klausul: %s", exc)

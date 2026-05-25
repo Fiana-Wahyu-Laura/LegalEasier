@@ -323,7 +323,7 @@ class TestAnalyzeDocument:
         "disclaimer": DISCLAIMER,
     })
 
-    @patch("llm.analyzer._call_llm")
+    @patch("llm.analyzer.call_llm")
     def test_successful_analysis(self, mock_llm: MagicMock) -> None:
         mock_llm.return_value = self.MOCK_LLM_RESPONSE
         result = analyze_document("doc-123", ["chunk 1", "chunk 2"])
@@ -333,7 +333,7 @@ class TestAnalyzeDocument:
         assert result.disclaimer == DISCLAIMER
         mock_llm.assert_called_once()
 
-    @patch("llm.analyzer._call_llm")
+    @patch("llm.analyzer.call_llm")
     def test_retry_on_parse_error(self, mock_llm: MagicMock) -> None:
         # First call returns invalid JSON, second call returns valid
         mock_llm.side_effect = [
@@ -344,7 +344,7 @@ class TestAnalyzeDocument:
         assert len(result.risk_clauses) == 2
         assert mock_llm.call_count == 2
 
-    @patch("llm.analyzer._call_llm")
+    @patch("llm.analyzer.call_llm")
     def test_returns_empty_after_max_retries(self, mock_llm: MagicMock) -> None:
         mock_llm.return_value = "invalid json forever"
         result = analyze_document("doc-789", ["chunk"])
@@ -352,7 +352,7 @@ class TestAnalyzeDocument:
         assert result.summary == ""
         assert mock_llm.call_count == 2
 
-    @patch("llm.analyzer._call_llm")
+    @patch("llm.analyzer.call_llm")
     def test_runtime_error_returns_empty(self, mock_llm: MagicMock) -> None:
         mock_llm.side_effect = RuntimeError("API down")
         result = analyze_document("doc-err", ["chunk"])
@@ -367,7 +367,7 @@ class TestAnalyzeDocument:
         result = analyze_document("doc-no-chunks", [])
         assert len(result.risk_clauses) == 0
 
-    @patch("llm.analyzer._call_llm")
+    @patch("llm.analyzer.call_llm")
     def test_whitespace_document_id(self, mock_llm: MagicMock) -> None:
         result = analyze_document("   ", ["chunk"])
         assert len(result.risk_clauses) == 0
@@ -467,14 +467,14 @@ class TestComputeRiskScore:
 class TestTranslateClause:
     """Tests untuk translate_clause (LLM di-mock)."""
 
-    @patch("llm.translator._call_llm")
+    @patch("llm.translator.call_llm")
     def test_successful_translation(self, mock_llm: MagicMock) -> None:
         mock_llm.return_value = "Artinya kamu harus bayar denda jika telat."
         result = translate_clause("Pihak kedua wajib membayar denda")
         assert "bayar denda" in result
         mock_llm.assert_called_once()
 
-    @patch("llm.translator._call_llm")
+    @patch("llm.translator.call_llm")
     def test_with_context(self, mock_llm: MagicMock) -> None:
         mock_llm.return_value = "Penjelasan klausul."
         result = translate_clause("Pasal 1", context="Kontrak sewa")
@@ -488,7 +488,7 @@ class TestTranslateClause:
         result = translate_clause("   ")
         assert result == ""
 
-    @patch("llm.translator._call_llm")
+    @patch("llm.translator.call_llm")
     def test_llm_error_returns_empty(self, mock_llm: MagicMock) -> None:
         mock_llm.side_effect = RuntimeError("API down")
         result = translate_clause("Pasal 1")
@@ -498,7 +498,7 @@ class TestTranslateClause:
 class TestTranslateClausesBatch:
     """Tests untuk translate_clauses_batch."""
 
-    @patch("llm.translator._call_llm")
+    @patch("llm.translator.call_llm")
     def test_batch_translation(self, mock_llm: MagicMock) -> None:
         mock_llm.side_effect = [
             "Terjemahan 1",
@@ -510,7 +510,7 @@ class TestTranslateClausesBatch:
         assert results[0] == "Terjemahan 1"
         assert mock_llm.call_count == 3
 
-    @patch("llm.translator._call_llm")
+    @patch("llm.translator.call_llm")
     def test_empty_batch(self, mock_llm: MagicMock) -> None:
         results = translate_clauses_batch([])
         assert results == []
