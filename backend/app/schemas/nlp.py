@@ -38,3 +38,26 @@ class NLPProcessResponse(BaseModel):
     disclaimer: str
 
     model_config = ConfigDict(extra="ignore")
+
+
+class NLPChatHistoryItem(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1)
+
+
+class NLPChatRequest(BaseModel):
+    document_id: str
+    query: str = Field(min_length=1)
+    history: list[NLPChatHistoryItem] = Field(default_factory=list, max_length=20)
+    top_k: int = Field(default=5, ge=1, le=10)
+
+
+class NLPChatResponse(BaseModel):
+    document_id: str
+    query: str
+    answer: str
+    context_chunks_used: int = 0
+    suggestions: list[str] = Field(default_factory=list)
+    disclaimer: str
+
+    model_config = ConfigDict(extra="ignore")

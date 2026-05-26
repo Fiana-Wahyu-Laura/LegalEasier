@@ -13,7 +13,13 @@ from uuid import UUID
 import httpx
 
 from app.core.config import get_settings
-from app.schemas.nlp import FileType, NLPProcessRequest, NLPProcessResponse
+from app.schemas.nlp import (
+    FileType,
+    NLPChatRequest,
+    NLPChatResponse,
+    NLPProcessRequest,
+    NLPProcessResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +112,46 @@ class NLPServiceClient:
             return None
         except Exception as e:
             logger.error("NLP service error for document %s: %s", document_id, e)
+            return None
+
+    async def chat_document(
+        self,
+        document_id: UUID,
+        query: str,
+        history: list[dict] | None = None,
+        top_k: int = 5,
+    ) -> NLPChatResponse | None:
+        """Send a chat question to NLP RAG endpoint."""
+        request = NLPChatRequest(
+            document_id=str(document_id),
+            query=query,
+            history=history or [],
+            top_k=top_k,
+        )
+
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                response = await client.post(
+                    f"{self.base_url}/nlp/chat",
+                    json=request.model_dump(mode="json"),
+                )
+
+                if response.status_code == 200:
+                    return NLPChatResponse.model_validate(response.json())
+
+                logger.error(
+                    "NLP chat service error for %s: %s %s",
+                    document_id,
+                    response.status_code,
+                    response.text,
+                )
+                return None
+
+        except httpx.TimeoutException:
+            logger.error("NLP chat service timeout for document %s", document_id)
+            return None
+        except Exception as e:
+            logger.error("NLP chat service error for %s: %s", document_id, e)
             return None
 
     async def delete_document_collection(
