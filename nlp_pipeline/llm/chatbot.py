@@ -47,6 +47,7 @@ class ChatResult:
     suggestions: list[str] = field(default_factory=list)
     disclaimer: str = DISCLAIMER
     context_chunks_used: int = 0
+    context_chunks: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -263,4 +264,5 @@ def chat_with_document(
         suggestions=suggestions,
         disclaimer=disclaimer,
         context_chunks_used=len(context_chunks),
+        context_chunks=context_chunks,
     )

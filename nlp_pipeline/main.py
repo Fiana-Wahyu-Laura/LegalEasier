@@ -576,6 +576,7 @@ async def nlp_chat(request: ChatRequest) -> ChatResponse:
         query=query,
         answer=result.answer,
         context_chunks_used=result.context_chunks_used,
+        context_chunks=result.context_chunks,
         suggestions=result.suggestions,
         disclaimer=result.disclaimer,
     )
