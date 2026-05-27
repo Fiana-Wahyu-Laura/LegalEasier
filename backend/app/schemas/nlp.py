@@ -57,6 +57,7 @@ class NLPChatResponse(BaseModel):
     query: str
     answer: str
     context_chunks_used: int = 0
+    context_chunks: list[str] = Field(default_factory=list)
     suggestions: list[str] = Field(default_factory=list)
     disclaimer: str
 

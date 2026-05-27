@@ -270,6 +270,7 @@ class ChatResponse(BaseModel):
     query: str
     answer: str = Field(description="Jawaban chatbot dalam bahasa Indonesia.")
     context_chunks_used: int = Field(description="Jumlah chunk konteks yang digunakan.")
+    context_chunks: list[str] = Field(default_factory=list, description="Teks asli potongan dokumen yang menjadi konteks.")
     suggestions: list[str] = Field(
         default_factory=list,
         description="3 pertanyaan lanjutan yang disarankan.",
