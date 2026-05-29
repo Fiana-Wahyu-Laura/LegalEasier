@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:legaleasier/features/analysis/domain/analysis_result.dart';
 import 'package:legaleasier/features/document/domain/document.dart';
 
 /// Service untuk HTTP calls ke backend document endpoints
@@ -127,6 +128,28 @@ class DocumentService {
         throw Exception('Failed to delete document: ${response.statusCode}');
       }
     } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
+  /// GET /api/v1/documents/:id/analysis
+  /// Fetch document analysis result
+  Future<AnalysisResult?> fetchDocumentAnalysis(String id) async {
+    try {
+      final response = await dio.get('$_apiPrefix/documents/$id/analysis');
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        if (data['success'] == true && data['data'] != null) {
+          return AnalysisResult.fromJson(data['data'] as Map<String, dynamic>);
+        }
+        return null;
+      }
+      throw Exception('Failed to fetch analysis: ${response.statusCode}');
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return null;
+      }
       throw _handleDioError(e);
     }
   }

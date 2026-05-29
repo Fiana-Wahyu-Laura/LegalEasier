@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:legaleasier/features/analysis/domain/analysis_result.dart';
 import 'document.dart';
 
 /// Repository interface untuk Document operations
@@ -27,4 +28,7 @@ abstract class DocumentRepository {
 
   /// Get total document count
   Future<int> getDocumentCount();
+
+  /// Fetch analysis result for a document
+  Future<AnalysisResult?> getDocumentAnalysis(String id);
 }

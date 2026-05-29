@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:legaleasier/features/analysis/domain/analysis_result.dart';
 import 'package:legaleasier/features/document/domain/document.dart';
 import 'package:legaleasier/features/document/domain/document_repository.dart';
 import 'package:legaleasier/features/document/data/document_service.dart';
@@ -43,5 +44,10 @@ class DocumentRepositoryImpl implements DocumentRepository {
   @override
   Future<int> getDocumentCount() async {
     return documentService.getDocumentCount();
+  }
+
+  @override
+  Future<AnalysisResult?> getDocumentAnalysis(String id) async {
+    return documentService.fetchDocumentAnalysis(id);
   }
 }
