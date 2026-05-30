@@ -52,8 +52,8 @@ class AppRouter {
       GoRoute(
         path: '/documents/:id/chat',
         builder: (context, state) {
-          final documentId = state.params['id']!;
-          final documentTitle = state.queryParams['title'] ?? 'Chat AI LegalEasy';
+          final documentId = state.pathParameters['id']!;
+          final documentTitle = state.uri.queryParameters['title'] ?? 'Chat AI LegalEasy';
           return ChatScreen(
             documentId: documentId,
             documentTitle: documentTitle,
