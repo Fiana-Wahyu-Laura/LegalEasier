@@ -301,6 +301,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               )
                             : const Text('Masuk'),
                       ),
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: isLoading
+                            ? null
+                            : () {
+                                if (!mounted) return;
+                                context.go('/home');
+                              },
+                        child: const Text('Lanjutkan sebagai tamu'),
+                      ),
                     ],
                   ),
                 ),

@@ -6,6 +6,7 @@ import 'package:legaleasier/core/theme/app_theme.dart';
 import 'package:legaleasier/features/auth/presentation/providers/auth_provider.dart';
 import 'package:legaleasier/features/document/domain/document.dart';
 import 'package:legaleasier/features/document/presentation/widgets/quick_action_card.dart';
+import 'package:legaleasier/features/document/presentation/providers/guest_quota_provider.dart';
 import 'package:legaleasier/features/document/presentation/widgets/trial_banner.dart';
 import 'package:legaleasier/features/document/presentation/widgets/recent_documents_section.dart';
 import 'package:legaleasier/features/document/presentation/widgets/stat_box.dart';
@@ -42,6 +43,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  String _buildUserName(authUser) {
+    final displayName = authUser?.displayName?.trim();
+    return (displayName != null && displayName.isNotEmpty)
+        ? displayName
+        : (authUser?.email ?? 'Pengguna');
+  }
+
   Future<void> _signOut() async {
     setState(() {
       _isSigningOut = true;
@@ -73,11 +81,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final authUser = ref.watch(authNotifierProvider).value;
-    final displayName = authUser?.displayName?.trim();
-    final userName = (displayName != null && displayName.isNotEmpty)
-        ? displayName
-        : (authUser?.email ?? 'Pengguna');
+    final quotaState = ref.watch(guestQuotaProvider);
+    final recentDocumentsAsync = ref.watch(recentDocumentsProvider);
+    final remainingQuota = quotaState.value ?? 5;
+    final userName = _buildUserName(authUser);
     final userInitial = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
+    final isGuestUser = authUser == null;
+    final canUseFreeAnalysis = !isGuestUser || remainingQuota > 0;
+    final freeAnalysisValue = isGuestUser ? remainingQuota.toString() : '∞';
+    final freeAnalysisLabel = isGuestUser ? 'Sisa Gratis' : 'Akses AI';
 
     return Scaffold(
       backgroundColor: AppColors.pageBackground,
@@ -95,7 +107,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             padding: const EdgeInsets.only(right: 16),
             child: Center(
               child: GestureDetector(
-                onTap: _isSigningOut ? null : _signOut,
+                onTap: _isSigningOut
+                    ? null
+                    : () async {
+                        if (isGuestUser) {
+                          context.go('/login');
+                          return;
+                        }
+                        await _signOut();
+                      },
                 child: _isSigningOut
                     ? const SizedBox(
                         width: 36,
@@ -134,30 +154,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SizedBox(height: 16),
 
               // Trial banner
-              const TrialBanner(),
+              TrialBanner(
+                remaining: remainingQuota,
+                onUpgradeTap: () => context.go('/login'),
+              ),
               const SizedBox(height: 24),
 
               // Quick stats (3 stat boxes)
-              const Row(
+              Row(
                 children: [
-                  Expanded(
+                  const Expanded(
                     child: StatBox(
                       number: '0',
                       label: 'Dokumen',
                     ),
                   ),
-                  SizedBox(width: 8),
-                  Expanded(
+                  const SizedBox(width: 8),
+                  const Expanded(
                     child: StatBox(
                       number: '0',
                       label: 'Berisiko',
                     ),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: StatBox(
-                      number: '5',
-                      label: 'Sisa Gratis',
+                      number: freeAnalysisValue,
+                      label: freeAnalysisLabel,
                     ),
                   ),
                 ],
@@ -185,6 +208,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     bgColor: AppColors.uploadBg,
                     title: 'Upload\nDokumen',
                     onTap: () async {
+                      if (!canUseFreeAnalysis) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Kuota gratis habis. Silakan masuk untuk melanjutkan analisis.',
+                            ),
+                            backgroundColor: AppColors.danger,
+                          ),
+                        );
+                        return;
+                      }
+
                       final messenger = ScaffoldMessenger.of(context);
                       final result = await showModalBottomSheet<Document>(
                         context: context,
@@ -211,6 +247,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     bgColor: AppColors.scanBg,
                     title: 'Scan\nDokumen',
                     onTap: () async {
+                      if (!canUseFreeAnalysis) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Kuota gratis habis. Silakan masuk untuk melanjutkan analisis.',
+                            ),
+                            backgroundColor: AppColors.danger,
+                          ),
+                        );
+                        return;
+                      }
+
                       final messenger = ScaffoldMessenger.of(context);
                       final result = await showModalBottomSheet<Document>(
                         context: context,
@@ -235,7 +284,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     bgColor: AppColors.chatBg,
                     title: 'Tanya AI\nLegalEasy',
                     onTap: () {
-                      // TODO: Navigate to chat
+                      if (!canUseFreeAnalysis) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Kuota gratis habis. Silakan masuk untuk melanjutkan analisis.',
+                            ),
+                            backgroundColor: AppColors.danger,
+                          ),
+                        );
+                        return;
+                      }
+
+                      recentDocumentsAsync.when(
+                        data: (documents) {
+                          if (documents.isEmpty) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Belum ada dokumen. Upload dokumen terlebih dahulu untuk menggunakan chat AI.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          final document = documents.first;
+                          final encodedTitle = Uri.encodeComponent(document.filename);
+                          context.go('/documents/${document.id}/chat?title=$encodedTitle');
+                        },
+                        loading: () {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Memuat dokumen terbaru...'),
+                            ),
+                          );
+                        },
+                        error: (error, stackTrace) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Gagal memuat dokumen terbaru. Coba lagi.'),
+                            ),
+                          );
+                        },
+                      );
                     },
                   ),
                   QuickActionCard(
@@ -244,7 +339,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     bgColor: AppColors.historyBg,
                     title: 'Riwayat\nDokumen',
                     onTap: () {
-                      // TODO: Navigate to history
+                      context.go('/history');
                     },
                   ),
                 ],

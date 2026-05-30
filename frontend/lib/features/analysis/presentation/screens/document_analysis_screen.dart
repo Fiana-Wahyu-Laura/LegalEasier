@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:legaleasier/core/theme/app_theme.dart';
 import 'package:legaleasier/features/analysis/domain/analysis_result.dart';
 import 'package:legaleasier/features/analysis/presentation/providers/analysis_provider.dart';
@@ -22,6 +23,21 @@ class DocumentAnalysisScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final analysisAsyncValue = ref.watch(documentAnalysisProvider(documentId));
 
+    final chatFab = analysisAsyncValue.maybeWhen(
+      data: (analysis) {
+        if (analysis == null) return null;
+        return FloatingActionButton.extended(
+          onPressed: () {
+            final encodedTitle = Uri.encodeComponent(documentTitle);
+            context.go('/documents/$documentId/chat?title=$encodedTitle');
+          },
+          icon: const Icon(Icons.chat_bubble_outline),
+          label: const Text('Tanya AI'),
+        );
+      },
+      orElse: () => null,
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: Text(documentTitle),
@@ -35,6 +51,7 @@ class DocumentAnalysisScreen extends ConsumerWidget {
           ),
         ],
       ),
+      floatingActionButton: chatFab,
       body: analysisAsyncValue.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) => Center(

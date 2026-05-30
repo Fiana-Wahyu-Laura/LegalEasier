@@ -4,10 +4,12 @@ import 'package:legaleasier/core/theme/app_theme.dart';
 /// Trial banner yang menampilkan sisa analisis gratis
 class TrialBanner extends StatelessWidget {
   final int remaining;
+  final VoidCallback? onUpgradeTap;
 
   const TrialBanner({
     super.key,
     this.remaining = 5,
+    this.onUpgradeTap,
   });
 
   @override
@@ -42,16 +44,19 @@ class TrialBanner extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.accent,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            child: Text(
-              'Upgrade',
-              style: AppTextStyles.badgeText.copyWith(
-                color: AppColors.brand,
+          GestureDetector(
+            onTap: onUpgradeTap,
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              child: Text(
+                'Upgrade',
+                style: AppTextStyles.badgeText.copyWith(
+                  color: AppColors.brand,
+                ),
               ),
             ),
           ),

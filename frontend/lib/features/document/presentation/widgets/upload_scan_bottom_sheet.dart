@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:legaleasier/core/theme/app_theme.dart';
+import 'package:legaleasier/features/auth/presentation/providers/auth_provider.dart';
 import 'package:legaleasier/features/document/presentation/providers/document_provider.dart';
+import 'package:legaleasier/features/document/presentation/providers/guest_quota_provider.dart';
 
 /// Bottom sheet untuk upload atau scan dokumen
 /// Design: Radius 20px top, scan preview, 2 opsi (Kamera/Upload), 2 tombol (Batal/Ambil Foto)
@@ -34,6 +36,10 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final authUser = ref.watch(authNotifierProvider).value;
+    final remainingQuota = ref.watch(guestQuotaProvider).value ?? 5;
+    final isGuest = authUser == null;
+    final isLocked = isGuest && remainingQuota <= 0;
     final uploadState = ref.watch(documentUploadProvider);
     final isUploading = uploadState.isLoading;
 
@@ -161,6 +167,17 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
             const SizedBox(height: 24),
 
             // Action buttons
+            if (isLocked)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Text(
+                  'Kuota gratis habis. Silakan masuk untuk melanjutkan analisis.',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.danger,
+                    height: 1.4,
+                  ),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               child: Row(
@@ -186,7 +203,7 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: isUploading ? null : _handlePrimaryAction,
+                      onPressed: isUploading || isLocked ? null : _handlePrimaryAction,
                       child: isUploading
                           ? const SizedBox(
                               height: 18,
@@ -199,9 +216,11 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
                               ),
                             )
                           : Text(
-                              _selectedMethod == UploadMethod.scan
-                                  ? 'Ambil Foto'
-                                  : 'Pilih File',
+                              isLocked
+                                  ? 'Kuota Habis'
+                                  : _selectedMethod == UploadMethod.scan
+                                      ? 'Ambil Foto'
+                                      : 'Pilih File',
                               style: AppTextStyles.buttonText,
                             ),
                     ),
@@ -288,6 +307,15 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
 
       final uploadedDocument =
           await ref.read(documentUploadProvider.notifier).uploadDocument(file);
+
+      final authUser = ref.read(authNotifierProvider).value;
+      if (authUser == null) {
+        try {
+          await ref.read(guestQuotaProvider.notifier).consumeAnalysis(isGuest: true);
+        } catch (_) {
+          // If quota persistence fails, continue without blocking upload completion.
+        }
+      }
 
       if (!mounted) return;
       Navigator.of(context).pop(uploadedDocument);
