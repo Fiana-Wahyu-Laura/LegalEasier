@@ -45,6 +45,14 @@ class AnalysisResult {
     required this.disclaimer,
   });
 
+  String get riskLevel {
+    if (riskScore == null) return 'Aman';
+    if (riskScore! <= 20) return 'Aman';
+    if (riskScore! <= 40) return 'Rendah';
+    if (riskScore! <= 70) return 'Sedang';
+    return 'Tinggi';
+  }
+
   factory AnalysisResult.fromJson(Map<String, dynamic> json) {
     final clauses = (json['risk_clauses'] as List<dynamic>?)
             ?.map((item) => RiskClause.fromJson(item as Map<String, dynamic>))

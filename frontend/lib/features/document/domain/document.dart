@@ -23,12 +23,20 @@ class Document {
     return Document(
       id: json['id'] as String,
       filename: json['filename'] as String,
-      uploadedAt: DateTime.parse(json['uploaded_at'] as String),
+      uploadedAt: DateTime.parse((json['created_at'] ?? json['uploaded_at']) as String),
       riskScore: json['risk_score'] as int?,
-      riskLevel: json['risk_level'] as String?,
-      hasAnalysis: json['has_analysis'] as bool? ?? false,
+      riskLevel: json['risk_level'] as String? ?? _calculateRiskLevel(json['risk_score'] as int?),
+      hasAnalysis: json['has_analysis'] as bool? ?? (json['status'] == 'done'),
       fileType: json['file_type'] as String?,
     );
+  }
+
+  static String? _calculateRiskLevel(int? score) {
+    if (score == null) return null;
+    if (score <= 20) return 'Aman';
+    if (score <= 40) return 'Rendah';
+    if (score <= 70) return 'Sedang';
+    return 'Tinggi';
   }
 
   /// Convert ke JSON untuk API requests
