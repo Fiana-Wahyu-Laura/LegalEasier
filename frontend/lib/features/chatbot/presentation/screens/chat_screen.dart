@@ -39,13 +39,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final chatState = ref.watch(chatNotifierProvider(widget.documentId));
 
+    final data = chatState.maybeWhen(data: (d) => d, orElse: () => null);
+    final suggestions = data?.suggestions ?? <String>[];
+    final isSending = data?.isSending == true;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.documentTitle),
         actions: [
           IconButton(
             onPressed: () {
-              ref.refresh(chatNotifierProvider(widget.documentId));
+              ref.invalidate(chatNotifierProvider(widget.documentId));
             },
             icon: const Icon(Icons.refresh),
             tooltip: 'Muat ulang',
@@ -93,9 +97,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
           const Divider(height: 1),
-          if (chatState.asData?.value?.suggestions.isNotEmpty ?? false)
+          if (suggestions.isNotEmpty)
             SuggestionChips(
-              suggestions: chatState.asData!.value!.suggestions,
+              suggestions: suggestions,
               onSelected: (suggestion) {
                 _messageController.text = suggestion;
                 _sendMessage();
@@ -119,10 +123,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 const SizedBox(width: 10),
                 IconButton(
                   icon: const Icon(Icons.send),
-                  color: chatState.asData?.value?.isSending == true
-                      ? AppColors.text3
-                      : AppColors.brand,
-                  onPressed: chatState.asData?.value?.isSending == true ? null : _sendMessage,
+                  color: isSending ? AppColors.text3 : AppColors.brand,
+                  onPressed: isSending ? null : _sendMessage,
                 ),
               ],
             ),

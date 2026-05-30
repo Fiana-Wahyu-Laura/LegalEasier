@@ -6,6 +6,7 @@ import 'package:legaleasier/core/theme/app_theme.dart';
 import 'package:legaleasier/features/auth/presentation/providers/auth_provider.dart';
 import 'package:legaleasier/features/document/domain/document.dart';
 import 'package:legaleasier/features/document/presentation/widgets/quick_action_card.dart';
+import 'package:legaleasier/features/document/presentation/providers/document_provider.dart';
 import 'package:legaleasier/features/document/presentation/providers/guest_quota_provider.dart';
 import 'package:legaleasier/features/document/presentation/widgets/trial_banner.dart';
 import 'package:legaleasier/features/document/presentation/widgets/recent_documents_section.dart';

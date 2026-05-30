@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:legaleasier/core/theme/app_theme.dart';
-import 'package:legaleasier/features/analysis/domain/analysis_result.dart';
 import 'package:legaleasier/features/analysis/presentation/providers/analysis_provider.dart';
 import 'package:legaleasier/features/analysis/presentation/widgets/analysis_disclaimer_card.dart';
 import 'package:legaleasier/features/analysis/presentation/widgets/analysis_summary_card.dart';
@@ -128,7 +127,7 @@ class DocumentAnalysisScreen extends ConsumerWidget {
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black.withOpacity(0.06)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
       ),
       padding: const EdgeInsets.all(16),
       child: Text(
@@ -144,7 +143,7 @@ class DocumentAnalysisScreen extends ConsumerWidget {
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black.withOpacity(0.06)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
       ),
       padding: const EdgeInsets.all(16),
       child: Text(

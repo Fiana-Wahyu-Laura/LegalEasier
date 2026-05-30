@@ -24,13 +24,13 @@ class MessageBubble extends StatelessWidget {
               color: bubbleColor,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isUser ? AppColors.brand2 : Colors.black.withOpacity(0.08),
+                color: isUser ? AppColors.brand2 : Colors.black.withValues(alpha: 0.08),
               ),
             ),
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
             child: Text(
               message.text,
-              style: AppTextStyles.bodyLarge.copyWith(color: textColor),
+              style: AppTextStyles.bodyMedium.copyWith(color: textColor),
             ),
           ),
           const SizedBox(height: 6),

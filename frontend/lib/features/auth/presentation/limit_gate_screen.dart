@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:legaleasier/core/theme/app_theme.dart';
-import 'package:legaleasier/features/auth/presentation/RegisterScreen.dart';
-import 'package:legaleasier/features/auth/presentation/LoginScreen.dart';
-import 'package:legaleasier/features/auth/presentation/trial_provider.dart';
+import 'package:legaleasier/features/auth/presentation/register_screen.dart';
+import 'package:legaleasier/features/auth/presentation/login_screen.dart';
+// trial_provider intentionally not used here (UI-only screen)
 
 class LimitGateScreen extends ConsumerWidget {
-  const LimitGateScreen({Key? key}) : super(key: key);
+  const LimitGateScreen({super.key});
 
   Widget _benefitRow(String text) {
     return Padding(

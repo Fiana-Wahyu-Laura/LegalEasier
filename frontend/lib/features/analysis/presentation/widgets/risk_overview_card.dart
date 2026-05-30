@@ -34,7 +34,7 @@ class RiskOverviewCard extends StatelessWidget {
         const SizedBox(width: 12),
         Container(
           decoration: BoxDecoration(
-            color: _riskLevelColor(riskLevel).withOpacity(0.12),
+            color: _riskLevelColor(riskLevel).withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(16),
           ),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),

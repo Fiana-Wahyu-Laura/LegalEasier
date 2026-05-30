@@ -31,7 +31,7 @@ class RecentDocumentsSection extends ConsumerWidget {
               color: AppColors.white,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: Colors.black.withOpacity(0.08),
+                color: Colors.black.withValues(alpha: 0.08),
                 width: 0.5,
               ),
             ),
@@ -46,7 +46,7 @@ class RecentDocumentsSection extends ConsumerWidget {
               color: AppColors.white,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: Colors.black.withOpacity(0.08),
+                color: Colors.black.withValues(alpha: 0.08),
                 width: 0.5,
               ),
             ),
@@ -62,7 +62,7 @@ class RecentDocumentsSection extends ConsumerWidget {
                   color: AppColors.white,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: Colors.black.withOpacity(0.08),
+                    color: Colors.black.withValues(alpha: 0.08),
                     width: 0.5,
                   ),
                 ),
@@ -123,7 +123,7 @@ class RecentDocumentsSection extends ConsumerWidget {
           color: AppColors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             width: 0.5,
           ),
         ),

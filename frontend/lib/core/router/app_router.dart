@@ -5,10 +5,10 @@ import 'package:legaleasier/features/chatbot/presentation/screens/chat_screen.da
 import 'package:legaleasier/features/auth/presentation/limit_gate_screen.dart';
 import 'package:legaleasier/features/document/presentation/screens/document_history_screen.dart';
 import 'package:legaleasier/features/document/presentation/screens/home_screen.dart';
-import 'package:legaleasier/features/auth/presentation/LoginScreen.dart';
-import 'package:legaleasier/features/auth/presentation/RegisterScreen.dart';
-import 'package:legaleasier/features/onboarding/presentation/OnboardingScreen.dart';
-import 'package:legaleasier/features/onboarding/presentation/SplashScreen.dart';
+import 'package:legaleasier/features/auth/presentation/login_screen.dart';
+import 'package:legaleasier/features/auth/presentation/register_screen.dart';
+import 'package:legaleasier/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:legaleasier/features/onboarding/presentation/splash_screen.dart';
 
 class AppRouter {
   static final router = GoRouter(
@@ -52,8 +52,8 @@ class AppRouter {
       GoRoute(
         path: '/documents/:id/chat',
         builder: (context, state) {
-          final documentId = state.params['id']!;
-          final documentTitle = state.queryParams['title'] ?? 'Chat AI LegalEasy';
+          final documentId = state.pathParameters['id']!;
+          final documentTitle = state.uri.queryParameters['title'] ?? 'Chat AI LegalEasy';
           return ChatScreen(
             documentId: documentId,
             documentTitle: documentTitle,
