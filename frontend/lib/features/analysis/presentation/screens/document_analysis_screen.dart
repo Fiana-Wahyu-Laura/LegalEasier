@@ -30,7 +30,7 @@ class DocumentAnalysisScreen extends ConsumerWidget {
             icon: const Icon(Icons.refresh),
             tooltip: 'Muat ulang',
             onPressed: () {
-              ref.refresh(documentAnalysisProvider(documentId));
+              ref.invalidate(documentAnalysisProvider(documentId));
             },
           ),
         ],
@@ -62,9 +62,7 @@ class DocumentAnalysisScreen extends ConsumerWidget {
           }
 
           final summary = analysis.summary?.trim();
-          final riskLevel = analysis.riskClauses.isNotEmpty
-              ? analysis.riskClauses.first.riskLevel
-              : 'Aman';
+          final riskLevel = analysis.riskLevel;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),

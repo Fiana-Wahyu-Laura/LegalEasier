@@ -34,8 +34,8 @@ class AppRouter {
       GoRoute(
         path: '/documents/:id/analysis',
         builder: (context, state) {
-          final documentId = state.params['id']!;
-          final documentTitle = state.queryParams['title'] ?? 'Detail Dokumen';
+          final documentId = state.pathParameters['id']!;
+          final documentTitle = state.uri.queryParameters['title'] ?? 'Detail Dokumen';
           return DocumentAnalysisScreen(
             documentId: documentId,
             documentTitle: documentTitle,
