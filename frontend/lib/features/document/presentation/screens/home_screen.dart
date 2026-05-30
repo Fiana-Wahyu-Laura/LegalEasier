@@ -12,6 +12,7 @@ import 'package:legaleasier/features/document/presentation/widgets/trial_banner.
 import 'package:legaleasier/features/document/presentation/widgets/recent_documents_section.dart';
 import 'package:legaleasier/features/document/presentation/widgets/stat_box.dart';
 import 'package:legaleasier/features/document/presentation/widgets/upload_scan_bottom_sheet.dart';
+import 'package:legaleasier/features/document/presentation/providers/document_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
