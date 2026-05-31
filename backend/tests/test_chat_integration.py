@@ -22,6 +22,7 @@ import os
 import subprocess
 import sys
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -30,8 +31,10 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.api.deps import get_current_user, get_db
+from app.core.config import get_settings
 from app.main import app
 from app.models.chat_message import ChatMessage
 from app.models.guest_quota import GuestQuota
@@ -50,11 +53,16 @@ TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
     os.environ.get(
         "DATABASE_URL",
-        "postgresql+asyncpg://postgres:password@localhost:5432/legaleasier",
+        get_settings().database_url,
     ),
 )
 
-test_engine = create_async_engine(TEST_DATABASE_URL, echo=False, future=True)
+test_engine = create_async_engine(
+    TEST_DATABASE_URL,
+    echo=False,
+    future=True,
+    poolclass=NullPool,
+)
 TestSessionLocal = async_sessionmaker(
     bind=test_engine,
     class_=AsyncSession,
@@ -119,7 +127,7 @@ async def db_session():
 
 
 @pytest_asyncio.fixture()
-async def seeded_user_and_doc(db_session: AsyncSession):
+async def seeded_user_and_doc():
     """
     Buat 1 user dan 1 document di PostgreSQL sungguhan.
     Hapus keduanya (beserta chat_messages dan guest_quotas terkait) setelah test.
@@ -143,32 +151,60 @@ async def seeded_user_and_doc(db_session: AsyncSession):
         extracted_text="Isi kontrak kerja untuk keperluan test integrasi Sprint 4.",
     )
 
-    db_session.add(user)
-    db_session.add(document)
-    await db_session.commit()
-    await db_session.refresh(user)
-    await db_session.refresh(document)
+    now = datetime.now(timezone.utc)
+
+    async with test_engine.begin() as conn:
+        await conn.execute(
+            text(
+                "INSERT INTO users (id, firebase_uid, email, display_name, is_active, created_at) "
+                "VALUES (:id, :firebase_uid, :email, :display_name, :is_active, :created_at)"
+            ),
+            {
+                "id": user_id,
+                "firebase_uid": user.firebase_uid,
+                "email": user.email,
+                "display_name": user.display_name,
+                "is_active": user.is_active,
+                "created_at": now,
+            },
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO documents (id, owner_id, filename, storage_path, status, extracted_text, created_at, updated_at) "
+                "VALUES (:id, :owner_id, :filename, :storage_path, :status, :extracted_text, :created_at, :updated_at)"
+            ),
+            {
+                "id": doc_id,
+                "owner_id": user_id,
+                "filename": document.filename,
+                "storage_path": document.storage_path,
+                "status": document.status,
+                "extracted_text": document.extracted_text,
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
 
     yield user, document
 
     # Teardown — urutan penting karena FK constraint
-    await db_session.execute(
-        text("DELETE FROM chat_messages WHERE document_id = :doc_id"),
-        {"doc_id": doc_id},
-    )
-    await db_session.execute(
-        text("DELETE FROM guest_quotas WHERE user_id = :user_id"),
-        {"user_id": user_id},
-    )
-    await db_session.execute(
-        text("DELETE FROM documents WHERE id = :doc_id"),
-        {"doc_id": doc_id},
-    )
-    await db_session.execute(
-        text("DELETE FROM users WHERE id = :user_id"),
-        {"user_id": user_id},
-    )
-    await db_session.commit()
+    async with test_engine.begin() as conn:
+        await conn.execute(
+            text("DELETE FROM chat_messages WHERE document_id = :doc_id"),
+            {"doc_id": doc_id},
+        )
+        await conn.execute(
+            text("DELETE FROM guest_quotas WHERE user_id = :user_id"),
+            {"user_id": user_id},
+        )
+        await conn.execute(
+            text("DELETE FROM documents WHERE id = :doc_id"),
+            {"doc_id": doc_id},
+        )
+        await conn.execute(
+            text("DELETE FROM users WHERE id = :user_id"),
+            {"user_id": user_id},
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -199,7 +235,7 @@ class _FakeNLPClient:
 # ---------------------------------------------------------------------------
 
 
-def _build_client(user: User, db_session: AsyncSession) -> AsyncClient:
+def _build_client(user: User) -> AsyncClient:
     auth_user = AuthUser(
         id=user.id,
         email=user.email,
@@ -211,7 +247,8 @@ def _build_client(user: User, db_session: AsyncSession) -> AsyncClient:
         return auth_user
 
     async def _override_get_db():
-        yield db_session
+        async with TestSessionLocal() as session:
+            yield session
 
     def _override_nlp_client():
         return _FakeNLPClient()
@@ -236,7 +273,7 @@ async def test_chat_message_persisted_to_db(seeded_user_and_doc, db_session):
     """
     user, document = seeded_user_and_doc
 
-    async with _build_client(user, db_session) as client:
+    async with _build_client(user) as client:
         response = await client.post(
             f"/api/v1/chat/{document.id}/message",
             json={
@@ -312,18 +349,23 @@ async def test_chat_history_reads_from_db(seeded_user_and_doc, db_session):
 
     # Seed langsung ke DB
     msg_id = uuid.uuid4()
-    chat_msg = ChatMessage(
-        id=msg_id,
-        user_id=user.id,
-        document_id=document.id,
-        question="Pertanyaan yang di-seed langsung",
-        answer="Jawaban yang di-seed langsung",
-        sources_json=json.dumps(["source-X", "source-Y"]),
-    )
-    db_session.add(chat_msg)
-    await db_session.commit()
+    async with test_engine.begin() as conn:
+        await conn.execute(
+            text(
+                "INSERT INTO chat_messages (id, user_id, document_id, question, answer, sources_json) "
+                "VALUES (:id, :user_id, :document_id, :question, :answer, :sources_json)"
+            ),
+            {
+                "id": msg_id,
+                "user_id": user.id,
+                "document_id": document.id,
+                "question": "Pertanyaan yang di-seed langsung",
+                "answer": "Jawaban yang di-seed langsung",
+                "sources_json": json.dumps(["source-X", "source-Y"]),
+            },
+        )
 
-    async with _build_client(user, db_session) as client:
+    async with _build_client(user) as client:
         response = await client.get(
             f"/api/v1/chat/{document.id}/history",
             headers={"Authorization": "Bearer inttest-token"},
@@ -365,9 +407,13 @@ async def test_guest_quota_exhausted_returns_429(seeded_user_and_doc, db_session
     user, document = seeded_user_and_doc
 
     # Seed GuestQuota dengan sisa = 0
-    quota = GuestQuota(user_id=user.id, remaining_quota=0)
-    db_session.add(quota)
-    await db_session.commit()
+    async with test_engine.begin() as conn:
+        await conn.execute(
+            text(
+                "INSERT INTO guest_quotas (user_id, remaining_quota) VALUES (:user_id, :remaining_quota)"
+            ),
+            {"user_id": user.id, "remaining_quota": 0},
+        )
 
     nlp_was_called = False
 
@@ -385,7 +431,8 @@ async def test_guest_quota_exhausted_returns_429(seeded_user_and_doc, db_session
         return auth_user
 
     async def _override_get_db():
-        yield db_session
+        async with TestSessionLocal() as session:
+            yield session
 
     app.dependency_overrides[get_current_user] = _override_current_user
     app.dependency_overrides[get_db] = _override_get_db
@@ -443,10 +490,52 @@ async def test_chat_forbidden_cross_user(db_session):
         status="completed",
     )
 
-    db_session.add(user_a)
-    db_session.add(user_b)
-    db_session.add(doc_b)
-    await db_session.commit()
+    now = datetime.now(timezone.utc)
+
+    async with test_engine.begin() as conn:
+        await conn.execute(
+            text(
+                "INSERT INTO users (id, firebase_uid, email, display_name, is_active, created_at) "
+                "VALUES (:id, :firebase_uid, :email, :display_name, :is_active, :created_at)"
+            ),
+            {
+                "id": user_a_id,
+                "firebase_uid": user_a.firebase_uid,
+                "email": user_a.email,
+                "display_name": user_a.display_name,
+                "is_active": user_a.is_active,
+                "created_at": now,
+            },
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO users (id, firebase_uid, email, display_name, is_active, created_at) "
+                "VALUES (:id, :firebase_uid, :email, :display_name, :is_active, :created_at)"
+            ),
+            {
+                "id": user_b_id,
+                "firebase_uid": user_b.firebase_uid,
+                "email": user_b.email,
+                "display_name": user_b.display_name,
+                "is_active": user_b.is_active,
+                "created_at": now,
+            },
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO documents (id, owner_id, filename, storage_path, status, created_at, updated_at) "
+                "VALUES (:id, :owner_id, :filename, :storage_path, :status, :created_at, :updated_at)"
+            ),
+            {
+                "id": doc_id,
+                "owner_id": user_b_id,
+                "filename": doc_b.filename,
+                "storage_path": doc_b.storage_path,
+                "status": doc_b.status,
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
 
     auth_user_a = AuthUser(
         id=user_a_id, email=user_a.email, display_name="User A", is_active=True
@@ -456,7 +545,8 @@ async def test_chat_forbidden_cross_user(db_session):
         return auth_user_a
 
     async def _override_get_db():
-        yield db_session
+        async with TestSessionLocal() as session:
+            yield session
 
     app.dependency_overrides[get_current_user] = _override_current_user
     app.dependency_overrides[get_db] = _override_get_db
@@ -474,16 +564,16 @@ async def test_chat_forbidden_cross_user(db_session):
     app.dependency_overrides.clear()
 
     # Teardown manual karena tidak pakai fixture seeded_user_and_doc
-    await db_session.execute(
-        text("DELETE FROM documents WHERE id = :id"), {"id": doc_id}
-    )
-    await db_session.execute(
-        text("DELETE FROM users WHERE id = :id"), {"id": user_a_id}
-    )
-    await db_session.execute(
-        text("DELETE FROM users WHERE id = :id"), {"id": user_b_id}
-    )
-    await db_session.commit()
+    async with test_engine.begin() as conn:
+        await conn.execute(
+            text("DELETE FROM documents WHERE id = :id"), {"id": doc_id}
+        )
+        await conn.execute(
+            text("DELETE FROM users WHERE id = :id"), {"id": user_a_id}
+        )
+        await conn.execute(
+            text("DELETE FROM users WHERE id = :id"), {"id": user_b_id}
+        )
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Access denied"
@@ -502,7 +592,7 @@ async def test_chat_document_not_found(seeded_user_and_doc, db_session):
     user, _ = seeded_user_and_doc
     nonexistent_doc_id = uuid.uuid4()
 
-    async with _build_client(user, db_session) as client:
+    async with _build_client(user) as client:
         response = await client.post(
             f"/api/v1/chat/{nonexistent_doc_id}/message",
             json={"message": "dokumen ini tidak ada"},
@@ -537,7 +627,7 @@ async def test_multiple_messages_quota_decrements_and_all_persisted(
     ]
 
     for i, question in enumerate(questions):
-        async with _build_client(user, db_session) as client:
+        async with _build_client(user) as client:
             response = await client.post(
                 f"/api/v1/chat/{document.id}/message",
                 json={"message": question, "top_k": 3},
@@ -596,7 +686,7 @@ async def test_chat_history_document_not_found(seeded_user_and_doc, db_session):
     user, _ = seeded_user_and_doc
     nonexistent_doc_id = uuid.uuid4()
 
-    async with _build_client(user, db_session) as client:
+    async with _build_client(user) as client:
         response = await client.get(
             f"/api/v1/chat/{nonexistent_doc_id}/history",
             headers={"Authorization": "Bearer inttest-token"},
@@ -644,10 +734,52 @@ async def test_chat_history_forbidden_cross_user(db_session):
         status="completed",
     )
 
-    db_session.add(user_a)
-    db_session.add(user_b)
-    db_session.add(doc_b)
-    await db_session.commit()
+    now = datetime.now(timezone.utc)
+
+    async with test_engine.begin() as conn:
+        await conn.execute(
+            text(
+                "INSERT INTO users (id, firebase_uid, email, display_name, is_active, created_at) "
+                "VALUES (:id, :firebase_uid, :email, :display_name, :is_active, :created_at)"
+            ),
+            {
+                "id": user_a_id,
+                "firebase_uid": user_a.firebase_uid,
+                "email": user_a.email,
+                "display_name": user_a.display_name,
+                "is_active": user_a.is_active,
+                "created_at": now,
+            },
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO users (id, firebase_uid, email, display_name, is_active, created_at) "
+                "VALUES (:id, :firebase_uid, :email, :display_name, :is_active, :created_at)"
+            ),
+            {
+                "id": user_b_id,
+                "firebase_uid": user_b.firebase_uid,
+                "email": user_b.email,
+                "display_name": user_b.display_name,
+                "is_active": user_b.is_active,
+                "created_at": now,
+            },
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO documents (id, owner_id, filename, storage_path, status, created_at, updated_at) "
+                "VALUES (:id, :owner_id, :filename, :storage_path, :status, :created_at, :updated_at)"
+            ),
+            {
+                "id": doc_id,
+                "owner_id": user_b_id,
+                "filename": doc_b.filename,
+                "storage_path": doc_b.storage_path,
+                "status": doc_b.status,
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
 
     auth_user_a = AuthUser(
         id=user_a_id, email=user_a.email, display_name="Hist User A", is_active=True
@@ -657,7 +789,8 @@ async def test_chat_history_forbidden_cross_user(db_session):
         return auth_user_a
 
     async def _override_get_db():
-        yield db_session
+        async with TestSessionLocal() as session:
+            yield session
 
     app.dependency_overrides[get_current_user] = _override_current_user
     app.dependency_overrides[get_db] = _override_get_db
@@ -673,16 +806,16 @@ async def test_chat_history_forbidden_cross_user(db_session):
     app.dependency_overrides.clear()
 
     # Teardown
-    await db_session.execute(
-        text("DELETE FROM documents WHERE id = :id"), {"id": doc_id}
-    )
-    await db_session.execute(
-        text("DELETE FROM users WHERE id = :id"), {"id": user_a_id}
-    )
-    await db_session.execute(
-        text("DELETE FROM users WHERE id = :id"), {"id": user_b_id}
-    )
-    await db_session.commit()
+    async with test_engine.begin() as conn:
+        await conn.execute(
+            text("DELETE FROM documents WHERE id = :id"), {"id": doc_id}
+        )
+        await conn.execute(
+            text("DELETE FROM users WHERE id = :id"), {"id": user_a_id}
+        )
+        await conn.execute(
+            text("DELETE FROM users WHERE id = :id"), {"id": user_b_id}
+        )
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Access denied"
