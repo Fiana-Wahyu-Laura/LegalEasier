@@ -54,7 +54,7 @@ class LimitGateScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 20),
-            Text(
+            const Text(
               'Kuota Gratis Habis',
               style: AppTextStyles.screenTitle,
               textAlign: TextAlign.center,
