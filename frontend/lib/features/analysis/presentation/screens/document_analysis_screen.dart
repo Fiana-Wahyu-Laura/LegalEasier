@@ -65,8 +65,8 @@ class DocumentAnalysisScreen extends ConsumerWidget {
         ),
         data: (analysis) {
           if (analysis == null) {
-            return const Center(
-              child: Padding(
+            return Center(
+              child: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 24),
                 child: Text(
                   'Analisis dokumen belum tersedia. Silakan periksa kembali setelah beberapa saat.',
@@ -90,7 +90,7 @@ class DocumentAnalysisScreen extends ConsumerWidget {
                   style: AppTextStyles.sectionTitle,
                 ),
                 const SizedBox(height: 8),
-                Text(
+                const Text(
                   'Ringkasan analisis dokumen',
                   style: AppTextStyles.label,
                 ),

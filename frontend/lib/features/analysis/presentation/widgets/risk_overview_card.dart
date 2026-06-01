@@ -21,7 +21,7 @@ class RiskOverviewCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Skor Risiko', style: AppTextStyles.label),
+                const Text('Skor Risiko', style: AppTextStyles.label),
                 const SizedBox(height: 8),
                 Text(
                   riskScore?.toString() ?? '-',
@@ -41,7 +41,7 @@ class RiskOverviewCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Level Risiko', style: AppTextStyles.label),
+              const Text('Level Risiko', style: AppTextStyles.label),
               const SizedBox(height: 8),
               Text(
                 riskLevel,
