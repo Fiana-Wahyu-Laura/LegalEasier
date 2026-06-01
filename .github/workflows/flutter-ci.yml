@@ -1,0 +1,70 @@
+name: Flutter CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  analyze_and_test:
+    name: Analyze and Test (Frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            frontend/.dart_tool
+            frontend/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('frontend/pubspec.yaml') }}
+
+      - name: Install dependencies
+        run: flutter pub get
+        working-directory: frontend
+
+      - name: Static analysis
+        run: flutter analyze
+        working-directory: frontend
+
+      - name: Run tests
+        run: flutter test --no-sound-null-safety
+        working-directory: frontend
+
+  build_apk:
+    name: Build APK (push only)
+    runs-on: ubuntu-latest
+    needs: analyze_and_test
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+        working-directory: frontend
+
+      - name: Build release APK
+        run: flutter build apk --release
+        working-directory: frontend
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: frontend/build/app/outputs/flutter-apk/app-release.apk
