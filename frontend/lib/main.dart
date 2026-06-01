@@ -43,20 +43,22 @@ class LegalEasierApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Friendly fallback UI for build errors
-    ErrorWidget.builder = (FlutterErrorDetails details) {
-      final message = kDebugMode ? details.exceptionAsString() : 'Terjadi kesalahan aplikasi.';
-      return MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(message, textAlign: TextAlign.center),
+    // Friendly fallback UI for build errors — only set in non-debug (release) mode
+    if (!kDebugMode) {
+      ErrorWidget.builder = (FlutterErrorDetails details) {
+        const message = 'Terjadi kesalahan aplikasi.';
+        return MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: const Text(message, textAlign: TextAlign.center),
+              ),
             ),
           ),
-        ),
-      );
-    };
+        );
+      };
+    }
 
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
