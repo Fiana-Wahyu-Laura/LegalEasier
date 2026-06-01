@@ -497,6 +497,16 @@ refactor/auth-repository
 - [x] UI polish pass (all screens) — initial polish applied to Chat and Document screens; further visual refinements planned
 
 # Sprint 6 — In progress
+- [x] Branch: created and pushed `feat/sprint6-frontend`
+- [x] App hardening: updated `frontend/lib/main.dart` (global error handling, `runZonedGuarded`, test-safe `ErrorWidget`)
+- [x] Lint fixes: resolved `prefer_const` and duplicate import issues across frontend files
+- [x] Static analysis: `flutter analyze` shows no issues
+- [x] Tests: `flutter test` all passed locally
+- [x] CI: added and pushed `.github/workflows/flutter-ci.yml` (analyze, test, build)
+- [x] Release: added `.github/workflows/flutter-release.yml` (AAB build)
+- [x] Deployment docs: added `frontend/DEPLOYMENT.md` with signing & secrets instructions
+- [x] Documentation: updated and committed `CLAUDE.md`
+- [ ] Create PR for `feat/sprint6-frontend` (PR page opened; ready to submit)
 - [ ] Full integration testing
 - [ ] Performance optimization
 - [ ] API documentation
