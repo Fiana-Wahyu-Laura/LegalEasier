@@ -90,7 +90,7 @@ class DocumentAnalysisScreen extends ConsumerWidget {
                   style: AppTextStyles.sectionTitle,
                 ),
                 const SizedBox(height: 8),
-                Text(
+                const Text(
                   'Ringkasan analisis dokumen',
                   style: AppTextStyles.label,
                 ),

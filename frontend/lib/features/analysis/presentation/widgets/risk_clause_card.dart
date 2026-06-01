@@ -41,7 +41,7 @@ class RiskClauseCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text('Bahasa sederhana', style: AppTextStyles.label),
+          const Text('Bahasa sederhana', style: AppTextStyles.label),
           const SizedBox(height: 8),
           Text(
             clause.plainLanguage,

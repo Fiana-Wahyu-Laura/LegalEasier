@@ -54,7 +54,7 @@ class LimitGateScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 20),
-            Text(
+            const Text(
               'Kuota Gratis Habis',
               style: AppTextStyles.screenTitle,
               textAlign: TextAlign.center,
@@ -78,8 +78,8 @@ class LimitGateScreen extends ConsumerWidget {
                 );
               },
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.brand),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 14),
                 child: Text('Daftar Gratis', style: AppTextStyles.buttonText),
               ),
             ),
