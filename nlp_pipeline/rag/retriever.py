@@ -20,7 +20,7 @@ import logging
 from dataclasses import dataclass, field
 
 from rag.embedder import embed_text
-from rag.vector_store import get_or_create_collection
+from rag.vector_store import get_collection_if_exists
 
 logger = logging.getLogger(__name__)
 
@@ -123,14 +123,23 @@ def retrieve_relevant_chunks(
             f"min_similarity harus antara 0.0 dan 1.0, bukan {min_similarity}."
         )
 
+    collection = get_collection_if_exists(document_id)
+    if collection is None:
+        logger.warning(
+            "Collection untuk dokumen '%s' belum tersedia; retrieval dilewati.",
+            document_id,
+        )
+        return RetrievalResult(
+            query=query,
+            top_k=top_k,
+            found_count=0,
+        )
+
     # Langkah 1: Embed query dengan model yang sama
     try:
         query_embedding = embed_text(query)
     except RuntimeError as exc:
         raise RuntimeError(f"Gagal meng-embed query: {exc}") from exc
-
-    # Langkah 2: Query ChromaDB
-    collection = get_or_create_collection(document_id)
 
     try:
         results = collection.query(
@@ -199,7 +208,13 @@ def retrieve_all_chunks(document_id: str) -> list[str]:
     if not document_id or not document_id.strip():
         raise ValueError("document_id tidak boleh kosong.")
 
-    collection = get_or_create_collection(document_id)
+    collection = get_collection_if_exists(document_id)
+    if collection is None:
+        logger.warning(
+            "Collection untuk dokumen '%s' belum tersedia.",
+            document_id,
+        )
+        return []
 
     try:
         count = collection.count()

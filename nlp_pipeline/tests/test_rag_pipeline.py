@@ -292,7 +292,7 @@ class TestRetriever:
 
     def test_retrieve_returns_result(self, mock_collection: MagicMock) -> None:
         with (
-            patch("rag.retriever.get_or_create_collection", return_value=mock_collection),
+            patch("rag.retriever.get_collection_if_exists", return_value=mock_collection),
             patch("rag.retriever.embed_text", return_value=[0.1] * 384),
         ):
             from rag.retriever import retrieve_relevant_chunks
@@ -300,9 +300,20 @@ class TestRetriever:
             assert isinstance(result, RetrievalResult)
             assert result.found_count == 3
 
+    def test_returns_empty_when_collection_missing(self) -> None:
+        with (
+            patch("rag.retriever.get_collection_if_exists", return_value=None),
+            patch("rag.retriever.embed_text") as mock_embed,
+        ):
+            from rag.retriever import retrieve_relevant_chunks
+            result = retrieve_relevant_chunks("test-doc", "pembayaran denda")
+            assert result.found_count == 0
+            assert result.chunks == []
+            mock_embed.assert_not_called()
+
     def test_retrieve_filters_by_min_similarity(self, mock_collection: MagicMock) -> None:
         with (
-            patch("rag.retriever.get_or_create_collection", return_value=mock_collection),
+            patch("rag.retriever.get_collection_if_exists", return_value=mock_collection),
             patch("rag.retriever.embed_text", return_value=[0.1] * 384),
         ):
             from rag.retriever import retrieve_relevant_chunks
@@ -312,7 +323,7 @@ class TestRetriever:
 
     def test_context_text_joins_chunks(self, mock_collection: MagicMock) -> None:
         with (
-            patch("rag.retriever.get_or_create_collection", return_value=mock_collection),
+            patch("rag.retriever.get_collection_if_exists", return_value=mock_collection),
             patch("rag.retriever.embed_text", return_value=[0.1] * 384),
         ):
             from rag.retriever import retrieve_relevant_chunks
@@ -337,7 +348,7 @@ class TestRetriever:
     def test_similarities_property(self, mock_collection: MagicMock) -> None:
         """Similarity harus = 1 - distance, min 0.0."""
         with (
-            patch("rag.retriever.get_or_create_collection", return_value=mock_collection),
+            patch("rag.retriever.get_collection_if_exists", return_value=mock_collection),
             patch("rag.retriever.embed_text", return_value=[0.1] * 384),
         ):
             from rag.retriever import retrieve_relevant_chunks
