@@ -27,6 +27,7 @@ langchain==0.2.0
 langchain-text-splitters==0.2.0
 sentence-transformers==2.7.0
 chromadb==0.5.0
+posthog==2.4.0
 
 # LLM (Sprint 3+)
 anthropic==0.34.0
