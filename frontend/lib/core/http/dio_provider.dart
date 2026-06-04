@@ -67,10 +67,10 @@ final dioProvider = Provider<Dio>((ref) {
 
 String _defaultBackendBaseUrl() {
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-    return 'https://le-backend.sughara.my.id';
+    return 'https://le-backend-1a4f906c.sughara.my.id/';
   }
 
-  return 'https://le-backend.sughara.my.id';
+  return 'https://le-backend-1a4f906c.sughara.my.id';
 }
 
 String _buildBackendBaseUrl(String backendBaseUrl) {
