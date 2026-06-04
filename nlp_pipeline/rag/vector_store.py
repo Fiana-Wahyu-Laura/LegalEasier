@@ -79,6 +79,54 @@ def _collection_name(document_id: str) -> str:
     return f"doc_{sanitized}"
 
 
+def get_collection_if_exists(document_id: str) -> Optional[Collection]:
+    """Ambil collection jika sudah ada (tanpa auto-create).
+
+    Args:
+        document_id: UUID dokumen dari backend.
+
+    Returns:
+        chromadb.Collection jika ada, atau None jika belum dibuat.
+
+    Raises:
+        ValueError: Jika document_id kosong.
+        RuntimeError: Jika ChromaDB gagal.
+    """
+    if not document_id or not document_id.strip():
+        raise ValueError("document_id tidak boleh kosong.")
+
+    client = get_chroma_client()
+    name = _collection_name(document_id)
+
+    try:
+        collections = client.list_collections()
+    except Exception as exc:
+        raise RuntimeError(
+            f"Gagal mengambil daftar collection ChromaDB: {exc}"
+        ) from exc
+
+    for item in collections:
+        item_name = None
+        if isinstance(item, Collection):
+            item_name = item.name
+        elif isinstance(item, dict):
+            item_name = item.get("name")
+        elif isinstance(item, str):
+            item_name = item
+
+        if item_name == name:
+            if isinstance(item, Collection):
+                return item
+            try:
+                return client.get_collection(name)
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Gagal mengambil collection '{name}': {exc}"
+                ) from exc
+
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Operasi collection
 # ---------------------------------------------------------------------------
@@ -243,11 +291,17 @@ def get_collection_info(document_id: str) -> dict:
     if not document_id or not document_id.strip():
         raise ValueError("document_id tidak boleh kosong.")
 
-    client = get_chroma_client()
     name = _collection_name(document_id)
 
     try:
-        collection = client.get_collection(name)
+        collection = get_collection_if_exists(document_id)
+        if collection is None:
+            return {
+                "collection_name": name,
+                "chunk_count": 0,
+                "exists": False,
+            }
+
         return {
             "collection_name": name,
             "chunk_count": collection.count(),
