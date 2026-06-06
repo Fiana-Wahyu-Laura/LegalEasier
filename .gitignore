@@ -63,3 +63,4 @@ chroma_db/
 # ===== Project-specific =====
 *.md
 !README.md
+frontend/android/local.properties
