@@ -16,7 +16,7 @@ final dioProvider = Provider<Dio>((ref) {
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
-      sendTimeout: const Duration(seconds: 30),
+      sendTimeout: const Duration(seconds: 60), // longer for uploads
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -24,6 +24,7 @@ final dioProvider = Provider<Dio>((ref) {
     ),
   );
 
+  // Firebase auth interceptor — attach ID token to every request
   dio.interceptors.add(
     InterceptorsWrapper(
       onRequest: (options, handler) async {
@@ -37,6 +38,9 @@ final dioProvider = Provider<Dio>((ref) {
     ),
   );
 
+  // Retry interceptor — auto-retry on 5xx and timeouts
+  dio.interceptors.add(_RetryInterceptor(dio: dio));
+
   if (kDebugMode) {
     dio.interceptors.add(
       LogInterceptor(
@@ -48,22 +52,66 @@ final dioProvider = Provider<Dio>((ref) {
     );
   }
 
-  // TODO: Add interceptor untuk JWT token
-  // dio.interceptors.add(
-  //   InterceptorsWrapper(
-  //     onRequest: (options, handler) async {
-  //       // Add JWT token dari SharedPreferences
-  //       return handler.next(options);
-  //     },
-  //     onError: (error, handler) {
-  //       // Handle 401 - refresh token atau logout
-  //       return handler.next(error);
-  //     },
-  //   ),
-  // );
-
   return dio;
 });
+
+/// Retry interceptor for transient server errors and timeouts.
+///
+/// Retries up to [maxRetries] times with exponential backoff.
+/// Only retries on 5xx status codes and timeout exceptions.
+class _RetryInterceptor extends Interceptor {
+  final Dio dio;
+  final int maxRetries;
+
+  _RetryInterceptor({required this.dio, this.maxRetries = 2});
+
+  @override
+  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+    final isRetryable = _isRetryableError(err);
+    final attempt = (err.requestOptions.extra['_retryAttempt'] as int?) ?? 0;
+
+    if (isRetryable && attempt < maxRetries) {
+      final nextAttempt = attempt + 1;
+      final delay = Duration(milliseconds: 500 * nextAttempt); // exponential backoff
+
+      if (kDebugMode) {
+        debugPrint('[Dio Retry] Attempt $nextAttempt/$maxRetries after ${delay.inMilliseconds}ms');
+      }
+
+      await Future<void>.delayed(delay);
+
+      // Clone request with incremented retry counter
+      final options = err.requestOptions;
+      options.extra['_retryAttempt'] = nextAttempt;
+
+      try {
+        final response = await dio.fetch(options);
+        return handler.resolve(response);
+      } on DioException catch (retryError) {
+        return handler.next(retryError);
+      }
+    }
+
+    return handler.next(err);
+  }
+
+  bool _isRetryableError(DioException err) {
+    // Retry on timeouts
+    if (err.type == DioExceptionType.connectionTimeout ||
+        err.type == DioExceptionType.receiveTimeout ||
+        err.type == DioExceptionType.sendTimeout) {
+      return true;
+    }
+
+    // Retry on 5xx server errors
+    final statusCode = err.response?.statusCode;
+    if (statusCode != null && statusCode >= 500) {
+      return true;
+    }
+
+    return false;
+  }
+}
 
 String _defaultBackendBaseUrl() {
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {

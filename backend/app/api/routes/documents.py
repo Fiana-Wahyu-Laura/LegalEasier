@@ -134,7 +134,16 @@ async def list_documents(
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     """List documents owned by the current user (CLAUDE.md §8)."""
+    from sqlalchemy import func
+
     offset = (page - 1) * limit
+
+    # Count total documents for pagination metadata
+    count_stmt = select(func.count()).select_from(Document).where(
+        Document.owner_id == current_user.id
+    )
+    total_count = (await db.execute(count_stmt)).scalar() or 0
+
     stmt = (
         select(Document)
         .options(load_only(*_LIST_COLUMNS))
@@ -148,7 +157,13 @@ async def list_documents(
     items = [DocumentListItem.model_validate(doc).model_dump(mode="json") for doc in documents]
     return StandardResponse(
         success=True,
-        data=items,
+        data={
+            "items": items,
+            "total_count": total_count,
+            "page": page,
+            "limit": limit,
+            "has_more": (offset + len(items)) < total_count,
+        },
         message=f"{len(items)} document(s) found.",
     )
 
