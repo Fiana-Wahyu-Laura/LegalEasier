@@ -19,16 +19,18 @@ pydantic==2.9.0
 pydantic-settings==2.5.0
 
 # NLP (Sprint 2+)
-# spacy==3.7.0
-# nltk==3.9.0
+spacy==3.7.0
+nltk==3.9.1
 
 # Chunking & RAG (Sprint 2+)
-# langchain==0.2.0
-# langchain-text-splitters==0.2.0
-# sentence-transformers==2.7.0
-# chromadb==0.5.0
+langchain==0.2.0
+langchain-text-splitters==0.2.0
+sentence-transformers==2.7.0
+chromadb==0.5.0
+posthog==2.4.0
 
 # LLM (Sprint 3+)
-# anthropic==0.34.0
-# openai==1.40.0
-# langgraph==0.2.0
+anthropic==0.34.0
+openai>=1.55.0
+httpx>=0.27.0
+langgraph==0.2.0

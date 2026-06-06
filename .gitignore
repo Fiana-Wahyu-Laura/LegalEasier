@@ -25,13 +25,20 @@ frontend/.pub/
 frontend/build/
 frontend/.flutter-plugins
 frontend/.flutter-plugins-dependencies
+frontend/.metadata
+frontend/legaleasier.iml
 *.iml
+*.g.dart
+*.freezed.dart
 
 # ===== Firebase credentials — NEVER commit =====
 **/google-services.json
 **/GoogleService-Info.plist
 **/firebase-credentials.json
+**/firebase_options.dart
+**/firebase.json
 firebase_app_id_file.json
+*.firebaserc
 
 # ===== IDE =====
 .idea/

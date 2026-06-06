@@ -1,0 +1,76 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: legaleasier
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/legaleasier
+      NLP_SERVICE_URL: http://localhost:8001
+      PYTHONPATH: ${{ github.workspace }}/backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Initialize database schema
+        run: |
+          python - <<'PY'
+          import asyncio
+
+          from app.models.base import Base
+          from app.db.session import engine
+
+          async def main():
+            async with engine.begin() as conn:
+              await conn.run_sync(Base.metadata.create_all)
+
+            await engine.dispose()
+
+          asyncio.run(main())
+          PY
+
+      - name: Run backend tests
+        run: |
+          pytest tests/test_documents.py tests/test_nlp_contract.py -q

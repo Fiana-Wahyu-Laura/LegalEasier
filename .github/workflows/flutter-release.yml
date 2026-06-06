@@ -1,0 +1,42 @@
+name: Flutter Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build_appbundle:
+    name: Build AAB (App Bundle)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            frontend/.dart_tool
+            frontend/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('frontend/pubspec.yaml') }}
+
+      - name: Install dependencies
+        run: flutter pub get
+        working-directory: frontend
+
+      - name: Build App Bundle (AAB)
+        run: flutter build appbundle --release
+        working-directory: frontend
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: frontend/build/app/outputs/bundle/release/app-release.aab

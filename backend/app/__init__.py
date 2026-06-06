@@ -1,0 +1,1 @@
+"""LegalEasier backend application package."""
