@@ -15,4 +15,9 @@ class ChatRepositoryImpl implements ChatRepository {
   ) async {
     return chatService.sendMessage(documentId, message, history);
   }
+
+  @override
+  Future<List<ChatMessage>> fetchHistory(String documentId) async {
+    return chatService.fetchHistory(documentId);
+  }
 }

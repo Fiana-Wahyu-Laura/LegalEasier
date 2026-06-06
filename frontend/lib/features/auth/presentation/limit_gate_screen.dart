@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:legaleasier/core/theme/app_theme.dart';
-import 'package:legaleasier/features/auth/presentation/register_screen.dart';
-import 'package:legaleasier/features/auth/presentation/login_screen.dart';
 // trial_provider intentionally not used here (UI-only screen)
 
 class LimitGateScreen extends ConsumerWidget {
@@ -72,11 +71,7 @@ class LimitGateScreen extends ConsumerWidget {
             _benefitRow('Akses fitur premium'),
             const Spacer(),
             ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                );
-              },
+              onPressed: () => context.go('/register'),
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.brand),
               child: const Padding(
                 padding: EdgeInsets.symmetric(vertical: 14),
@@ -85,12 +80,7 @@ class LimitGateScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             OutlinedButton(
-              onPressed: () {
-                // Google sign-in flow should be implemented by auth provider.
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                );
-              },
+              onPressed: () => context.go('/register'),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Text('Lanjut dengan Google', style: AppTextStyles.buttonText.copyWith(color: AppColors.brand)),
@@ -98,11 +88,7 @@ class LimitGateScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              },
+              onPressed: () => context.go('/login'),
               child: Text('Sudah punya akun? Masuk', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.text2)),
             ),
           ],

@@ -99,10 +99,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — izinkan backend (port 8000) memanggil service ini
+# CORS — izinkan backend memanggil service ini (localhost dev + Docker network)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000"],
+    allow_origins=[
+        "http://localhost:8000",
+        "http://170.30.0.3:8000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

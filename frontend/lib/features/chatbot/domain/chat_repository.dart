@@ -20,4 +20,6 @@ abstract class ChatRepository {
     String message,
     List<ChatMessage> history,
   );
+
+  Future<List<ChatMessage>> fetchHistory(String documentId);
 }

@@ -11,6 +11,10 @@ extension ChatMessageSenderExtension on ChatMessageSender {
   }
 }
 
+/// Monotonic counter to guarantee unique IDs even for rapid successive messages.
+int _idCounter = 0;
+String _nextId() => '${DateTime.now().microsecondsSinceEpoch}_${_idCounter++}';
+
 class ChatMessage {
   final String id;
   final String text;
@@ -28,7 +32,7 @@ class ChatMessage {
 
   factory ChatMessage.user(String text) {
     return ChatMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: _nextId(),
       text: text,
       sender: ChatMessageSender.user,
       timestamp: DateTime.now(),
@@ -37,7 +41,7 @@ class ChatMessage {
 
   factory ChatMessage.assistant(String text) {
     return ChatMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: _nextId(),
       text: text,
       sender: ChatMessageSender.assistant,
       timestamp: DateTime.now(),

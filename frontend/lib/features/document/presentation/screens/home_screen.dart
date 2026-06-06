@@ -155,26 +155,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Trial banner
-              TrialBanner(
-                remaining: remainingQuota,
-                onUpgradeTap: () => context.go('/login'),
-              ),
-              const SizedBox(height: 24),
+              // Trial banner (only for guest users)
+              if (isGuestUser)
+                TrialBanner(
+                  remaining: remainingQuota,
+                  onUpgradeTap: () => context.go('/login'),
+                ),
+              if (isGuestUser)
+                const SizedBox(height: 24),
 
               // Quick stats (3 stat boxes)
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: StatBox(
-                      number: '0',
+                      number: recentDocumentsAsync.maybeWhen(
+                        data: (docs) => docs.length.toString(),
+                        orElse: () => '-',
+                      ),
                       label: 'Dokumen',
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: StatBox(
-                      number: '0',
+                      number: recentDocumentsAsync.maybeWhen(
+                        data: (docs) => docs
+                            .where((d) =>
+                                d.riskLevel == 'Tinggi' ||
+                                d.riskLevel == 'Sedang')
+                            .length
+                            .toString(),
+                        orElse: () => '-',
+                      ),
                       label: 'Berisiko',
                     ),
                   ),

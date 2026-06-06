@@ -1,11 +1,12 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:legaleasier/core/constants/api_constants.dart';
 import 'package:legaleasier/features/analysis/domain/analysis_result.dart';
 import 'package:legaleasier/features/document/domain/document.dart';
 
 /// Service untuk HTTP calls ke backend document endpoints
 class DocumentService {
-  static const _apiPrefix = '/api/v1';
+  static const _apiPrefix = ApiConstants.apiPrefix;
 
   final Dio dio;
 

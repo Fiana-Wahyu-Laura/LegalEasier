@@ -52,16 +52,15 @@ final searchDocumentsProvider =
   return repository.searchDocuments(query);
 });
 
-/// Upload document notifier untuk handle upload state
-class DocumentUploadNotifier
-    extends StateNotifier<AsyncValue<Document?>> {
-  final DocumentRepository repository;
-
-  DocumentUploadNotifier(this.repository) : super(const AsyncValue.data(null));
+/// Upload document notifier — uses AsyncNotifier per CLAUDE.md §7
+class DocumentUploadNotifier extends AutoDisposeAsyncNotifier<Document?> {
+  @override
+  Future<Document?> build() async => null;
 
   Future<Document> uploadDocument(File file) async {
     state = const AsyncValue.loading();
     try {
+      final repository = ref.read(documentRepositoryProvider);
       final result = await repository.uploadDocument(file);
       state = AsyncValue.data(result);
       return result;
@@ -76,10 +75,8 @@ class DocumentUploadNotifier
   }
 }
 
-/// Upload document state notifier provider
-final documentUploadProvider = StateNotifierProvider.autoDispose<
-    DocumentUploadNotifier,
-    AsyncValue<Document?>>((ref) {
-  final repository = ref.watch(documentRepositoryProvider);
-  return DocumentUploadNotifier(repository);
-});
+/// Upload document provider
+final documentUploadProvider =
+    AsyncNotifierProvider.autoDispose<DocumentUploadNotifier, Document?>(
+  DocumentUploadNotifier.new,
+);

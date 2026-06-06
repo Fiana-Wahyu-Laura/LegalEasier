@@ -25,12 +25,14 @@ class ChatState {
   final List<String> suggestions;
   final int? remainingQuota;
   final bool isSending;
+  final String? errorMessage;
 
   ChatState({
     required this.messages,
     required this.suggestions,
     required this.remainingQuota,
     required this.isSending,
+    this.errorMessage,
   });
 
   factory ChatState.initial() {
@@ -39,6 +41,7 @@ class ChatState {
       suggestions: [],
       remainingQuota: null,
       isSending: false,
+      errorMessage: null,
     );
   }
 
@@ -47,12 +50,14 @@ class ChatState {
     List<String>? suggestions,
     int? remainingQuota,
     bool? isSending,
+    String? errorMessage,
   }) {
     return ChatState(
       messages: messages ?? this.messages,
       suggestions: suggestions ?? this.suggestions,
       remainingQuota: remainingQuota ?? this.remainingQuota,
       isSending: isSending ?? this.isSending,
+      errorMessage: errorMessage, // null explicitly clears error unless passed
     );
   }
 }
@@ -62,7 +67,19 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   final String documentId;
 
   ChatNotifier({required this.repository, required this.documentId})
-      : super(AsyncValue.data(ChatState.initial()));
+      : super(const AsyncValue.loading()) {
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final messages = await repository.fetchHistory(documentId);
+      state = AsyncValue.data(ChatState.initial().copyWith(messages: messages));
+    } catch (e, st) {
+      // Fallback to empty state on load failure
+      state = AsyncValue.data(ChatState.initial());
+    }
+  }
 
   Future<void> sendMessage(String message) async {
     final currentState = state.value ?? ChatState.initial();
@@ -88,7 +105,12 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       );
       state = AsyncValue.data(nextState);
     } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
+      // Preserve history, only update error message
+      state = AsyncValue.data(currentState.copyWith(
+        messages: updatedMessages,
+        isSending: false,
+        errorMessage: error.toString(),
+      ));
     }
   }
 }
