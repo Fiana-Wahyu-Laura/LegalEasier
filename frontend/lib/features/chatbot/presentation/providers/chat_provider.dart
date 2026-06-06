@@ -104,7 +104,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
         isSending: false,
       );
       state = AsyncValue.data(nextState);
-    } catch (error, stackTrace) {
+    } catch (error) {
       // Preserve history, only update error message
       state = AsyncValue.data(currentState.copyWith(
         messages: updatedMessages,

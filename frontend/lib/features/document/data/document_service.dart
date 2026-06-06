@@ -24,7 +24,10 @@ class DocumentService {
       if (response.statusCode == 200) {
         final data = response.data;
         if (data['success'] == true && data['data'] != null) {
-          final List<dynamic> documentsList = data['data'] as List<dynamic>;
+          final payload = data['data'];
+          // Handle paginated response { items: [...] } or flat array
+          final List<dynamic> documentsList =
+              payload is Map ? (payload['items'] as List<dynamic>? ?? []) : payload as List<dynamic>;
           return documentsList
               .map((doc) => Document.fromJson(doc as Map<String, dynamic>))
               .toList();
@@ -50,7 +53,10 @@ class DocumentService {
       if (response.statusCode == 200) {
         final data = response.data;
         if (data['success'] == true && data['data'] != null) {
-          final List<dynamic> documentsList = data['data'] as List<dynamic>;
+          final payload = data['data'];
+          // Handle paginated response { items: [...] } or flat array
+          final List<dynamic> documentsList =
+              payload is Map ? (payload['items'] as List<dynamic>? ?? []) : payload as List<dynamic>;
           return documentsList
               .map((doc) => Document.fromJson(doc as Map<String, dynamic>))
               .toList();
