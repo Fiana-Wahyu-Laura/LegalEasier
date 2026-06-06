@@ -18,7 +18,6 @@ router = APIRouter(prefix="/documents", tags=["analysis"])
 @router.get("/{document_id}/analysis", response_model=StandardResponse)
 async def get_document_analysis(
     document_id: uuid.UUID,
-    authorization: str = Header(..., description="Bearer token"),
     current_user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:

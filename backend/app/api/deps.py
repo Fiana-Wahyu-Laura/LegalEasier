@@ -130,6 +130,7 @@ async def get_current_user(
                 email=decoded_token.get("email", "dev@legaleasier.local"),
                 display_name=decoded_token.get("name", "Development User"),
                 is_active=True,
+                is_guest=True,
             )
         
         # Production: extract Firebase UID and ensure a matching local user exists.

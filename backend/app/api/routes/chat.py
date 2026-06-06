@@ -5,6 +5,7 @@ Chat API routes (Sprint 4).
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -27,11 +28,14 @@ from app.schemas.chat import (
 from app.schemas.common import StandardResponse
 from app.services.nlp_client import NLPServiceClient, get_nlp_client
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/chat", tags=["chat"])
 DEFAULT_GUEST_FREE_ANALYSES = 5
 
 
 async def _get_or_create_guest_quota(db: AsyncSession, user_id: uuid.UUID) -> GuestQuota:
+    """Get or create guest quota record for a user."""
     stmt = select(GuestQuota).where(GuestQuota.user_id == user_id)
     result = await db.execute(stmt)
     quota = result.scalar_one_or_none()
@@ -40,24 +44,20 @@ async def _get_or_create_guest_quota(db: AsyncSession, user_id: uuid.UUID) -> Gu
         return quota
 
     quota = GuestQuota(user_id=user_id, remaining_quota=DEFAULT_GUEST_FREE_ANALYSES)
-    if hasattr(db, "add"):
-        db.add(quota)
-    if hasattr(db, "commit"):
-        await db.commit()
-    if hasattr(db, "refresh"):
-        await db.refresh(quota)
+    db.add(quota)
+    await db.commit()
+    await db.refresh(quota)
     return quota
 
 
 async def _consume_guest_quota(db: AsyncSession, quota: GuestQuota) -> int:
+    """Decrement guest quota and return remaining count."""
     if quota.remaining_quota <= 0:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Guest quota exhausted")
 
     quota.remaining_quota -= 1
-    if hasattr(db, "commit"):
-        await db.commit()
-    if hasattr(db, "refresh"):
-        await db.refresh(quota)
+    await db.commit()
+    await db.refresh(quota)
     return quota.remaining_quota
 
 
@@ -75,6 +75,7 @@ async def send_chat_message(
     Backend responsibilities (Sprint 4):
     - enforce auth
     - enforce document ownership
+    - enforce guest quota (only for guest users)
     - proxy request to NLP /nlp/chat
     """
     stmt = select(Document).where(Document.id == document_id)
@@ -87,9 +88,10 @@ async def send_chat_message(
     if document.owner_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
+    # Guest quota enforcement — only applies to guest (mock mode) users
     remaining_quota: int | None = None
     guest_quota: GuestQuota | None = None
-    if hasattr(db, "execute"):
+    if current_user.is_guest:
         guest_quota = await _get_or_create_guest_quota(db, current_user.id)
         if guest_quota.remaining_quota <= 0:
             raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Guest quota exhausted")
@@ -118,31 +120,30 @@ async def send_chat_message(
         remaining_quota=None,
     )
 
+    # Consume guest quota after successful NLP response
     if guest_quota is not None:
         remaining_quota = await _consume_guest_quota(db, guest_quota)
         response_data.remaining_quota = remaining_quota
 
-    # Persist chat message to DB (guarded for fake DB used in tests)
+    # Persist chat message to DB
     try:
-        if hasattr(db, "add") and hasattr(db, "commit"):
-            sources_json = json.dumps(chat_result.context_chunks or [])
-            chat_msg = ChatMessage(
-                user_id=current_user.id,
-                document_id=document_id,
-                question=payload.message,
-                answer=chat_result.answer,
-                sources_json=sources_json,
-                created_at=datetime.now(timezone.utc),
-            )
-            db.add(chat_msg)
-            await db.commit()
-    except Exception:
-        # If persistence fails, do not block the user; log in real app.
-        if hasattr(db, "rollback"):
-            try:
-                await db.rollback()
-            except Exception:
-                pass
+        sources_json = json.dumps(chat_result.context_chunks or [])
+        chat_msg = ChatMessage(
+            user_id=current_user.id,
+            document_id=document_id,
+            question=payload.message,
+            answer=chat_result.answer,
+            sources_json=sources_json,
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(chat_msg)
+        await db.commit()
+    except Exception as exc:
+        logger.warning("Failed to persist chat message for doc %s: %s", document_id, exc)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
 
     return StandardResponse(
         success=True,
@@ -154,6 +155,8 @@ async def send_chat_message(
 @router.get("/{document_id}/history", response_model=StandardResponse)
 async def get_chat_history(
     document_id: uuid.UUID,
+    limit: int = 50,
+    offset: int = 0,
     current_user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
@@ -175,6 +178,8 @@ async def get_chat_history(
         .where(ChatMessage.document_id == document_id)
         .where(ChatMessage.user_id == current_user.id)
         .order_by(ChatMessage.created_at.asc())
+        .limit(limit)
+        .offset(offset)
     )
     history_result = await db.execute(history_stmt)
     history_rows = history_result.scalars().all()

@@ -1,13 +1,50 @@
 import 'package:dio/dio.dart';
+import 'package:legaleasier/core/constants/api_constants.dart';
 import 'package:legaleasier/features/chatbot/domain/chat_message.dart';
 import 'package:legaleasier/features/chatbot/domain/chat_repository.dart';
 
 class ChatService {
-  static const _apiPrefix = '/api/v1';
+  static const _apiPrefix = ApiConstants.apiPrefix;
 
   final Dio dio;
 
   ChatService({required this.dio});
+
+  /// Fetch persisted chat history from backend.
+  /// Returns a list of ChatMessage pairs (user question + assistant answer).
+  Future<List<ChatMessage>> fetchHistory(String documentId) async {
+    try {
+      final response = await dio.get(
+        '$_apiPrefix/chat/$documentId/history',
+        queryParameters: {'limit': 50, 'offset': 0},
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = response.data;
+        if (responseData['success'] == true && responseData['data'] != null) {
+          final data = responseData['data'] as Map<String, dynamic>;
+          final items = data['items'] as List<dynamic>? ?? [];
+
+          final messages = <ChatMessage>[];
+          for (final item in items) {
+            final question = item['question'] as String? ?? '';
+            final answer = item['answer'] as String? ?? '';
+            if (question.isNotEmpty) {
+              messages.add(ChatMessage.user(question));
+            }
+            if (answer.isNotEmpty) {
+              messages.add(ChatMessage.assistant(answer));
+            }
+          }
+          return messages;
+        }
+      }
+      return [];
+    } on DioException {
+      // Silently return empty on failure — chat will start fresh
+      return [];
+    }
+  }
 
   Future<ChatResponse> sendMessage(
     String documentId,

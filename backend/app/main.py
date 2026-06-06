@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.api.routes.health import router as health_router
 from app.api.routes.documents import router as documents_router
@@ -11,6 +12,8 @@ from app.core.config import get_settings
 settings = get_settings()
 
 app = FastAPI(title=settings.app_name, debug=settings.debug)
+
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 app.add_middleware(
     CORSMiddleware,

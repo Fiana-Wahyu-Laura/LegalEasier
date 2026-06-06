@@ -12,6 +12,7 @@ class AuthUser(BaseModel):
     email: str
     display_name: str | None = None
     is_active: bool
+    is_guest: bool = False
 
     class Config:
         from_attributes = True

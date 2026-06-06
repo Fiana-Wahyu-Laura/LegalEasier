@@ -21,8 +21,9 @@ from app.schemas.auth import AuthUser
 from app.schemas.common import StandardResponse
 from app.services.storage import get_storage_service, StorageService
 from app.services.nlp_client import get_nlp_client, NLPServiceClient
-from app.schemas.document import DocumentResponse, DocumentStatusResponse, DocumentTextResponse
+from app.schemas.document import DocumentListItem, DocumentResponse, DocumentStatusResponse, DocumentTextResponse
 from sqlalchemy import select
+from sqlalchemy.orm import load_only
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,20 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 # File upload constraints
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB
 ALLOWED_MIME_TYPES = {"application/pdf", "image/png", "image/jpeg", "image/tiff"}
+
+# Columns to load for list queries (exclude heavy BYTEA and text fields)
+_LIST_COLUMNS = [
+    Document.id,
+    Document.filename,
+    Document.storage_path,
+    Document.status,
+    Document.summary,
+    Document.risk_score,
+    Document.risk_clauses_json,
+    Document.created_at,
+    Document.updated_at,
+    Document.owner_id,
+]
 
 
 @router.post("/upload", response_model=StandardResponse, status_code=status.HTTP_201_CREATED)
@@ -122,6 +137,7 @@ async def list_documents(
     offset = (page - 1) * limit
     stmt = (
         select(Document)
+        .options(load_only(*_LIST_COLUMNS))
         .where(Document.owner_id == current_user.id)
         .order_by(Document.created_at.desc())
         .offset(offset)
@@ -129,12 +145,61 @@ async def list_documents(
     )
     result = await db.execute(stmt)
     documents = result.scalars().all()
-    items = [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in documents]
+    items = [DocumentListItem.model_validate(doc).model_dump(mode="json") for doc in documents]
     return StandardResponse(
         success=True,
         data=items,
         message=f"{len(items)} document(s) found.",
     )
+
+@router.get("/count", response_model=StandardResponse)
+async def get_document_count(
+    current_user: AuthUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> StandardResponse:
+    """Get total document count for current user (CLAUDE.md §8)."""
+    from sqlalchemy import func
+
+    stmt = select(func.count()).select_from(Document).where(
+        Document.owner_id == current_user.id
+    )
+    result = await db.execute(stmt)
+    count = result.scalar() or 0
+    return StandardResponse(
+        success=True,
+        data={"count": count},
+        message=f"User has {count} document(s).",
+    )
+
+
+@router.get("/search", response_model=StandardResponse)
+async def search_documents(
+    q: str = "",
+    limit: int = 20,
+    current_user: AuthUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> StandardResponse:
+    """Search documents by filename for current user (CLAUDE.md §8)."""
+    if not q.strip():
+        return StandardResponse(success=True, data=[], message="Empty query.")
+
+    stmt = (
+        select(Document)
+        .options(load_only(*_LIST_COLUMNS))
+        .where(Document.owner_id == current_user.id)
+        .where(Document.filename.ilike(f"%{q}%"))
+        .order_by(Document.created_at.desc())
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    documents = result.scalars().all()
+    items = [DocumentListItem.model_validate(doc).model_dump(mode="json") for doc in documents]
+    return StandardResponse(
+        success=True,
+        data=items,
+        message=f"{len(items)} document(s) found matching '{q}'.",
+    )
+
 
 @router.get("/{document_id}", response_model=StandardResponse)
 async def get_document(
