@@ -97,13 +97,13 @@ Lalu ikuti instruksi di folder sesuai jobdesk masing-masing.
 
 ## Tim
 
-| Nama                 | NIM        | Jobdesk |
-| -------------------- | ---------- | ------- |
-| Ester Faninta        | 2301020053 |         |
-| Jamalludin           | 2301020075 |         |
-| Fiana Wahyu Laura    | 2301020082 |         |
-| Indra Sugara         | 2301020084 |         |
-| Masry Ryzki Yanditar | 2301020087 |         |
+| Nama                 | NIM        | Jobdesk                              |
+| -------------------- | ---------- | ------------------------------------ |
+| Ester Faninta        | 2301020053 | Frontend: Flutter UI, Firebase Auth  |
+| Jamalludin           | 2301020075 | Backend: FastAPI, PostgreSQL         |
+| Fiana Wahyu Laura    | 2301020082 | Frontend: Flutter UI, Firebase Auth  |
+| Indra Sugara         | 2301020084 | AI/NLP: OCR, RAG, LLM, ChromaDB      |
+| Masry Ryzki Yanditar | 2301020087 | Backend: FastAPI, PostgreSQL         |
 
 ---
 

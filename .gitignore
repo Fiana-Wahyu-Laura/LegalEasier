@@ -52,3 +52,7 @@ chroma_db/
 # ===== Misc =====
 *.log
 *.tmp
+
+# ===== Project-specific =====
+*.md
+!README.md
