@@ -16,8 +16,19 @@ class User(Base):
     display_name: str | None = Column(String(255), nullable=True)
     hashed_password: str | None = Column(String(255), nullable=True)
     is_active: bool = Column(Boolean, default=True, nullable=False)
+    device_id: str | None = Column(String(255), index=True, nullable=True)  # For linking anonymous sessions
     created_at: datetime = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+    @property
+    def is_guest(self) -> bool:
+        """Return True for Firebase anonymous users represented in the local DB."""
+        email = self.email or ""
+        firebase_uid = self.firebase_uid or ""
+        return (
+            firebase_uid.startswith("anonymous:")
+            or (email.startswith("guest_") and email.endswith("@legaleasier.local"))
+        )

@@ -1,4 +1,4 @@
-package com.example.legaleasier
+package com.nicolambatron.legaleasier
 
 import io.flutter.embedding.android.FlutterActivity
 

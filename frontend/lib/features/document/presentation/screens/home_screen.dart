@@ -88,7 +88,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final remainingQuota = quotaState.value ?? 5;
     final userName = _buildUserName(authUser);
     final userInitial = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
-    final isGuestUser = authUser == null;
+    final isGuestUser = authUser?.isGuest ?? true;
     final canUseFreeAnalysis = !isGuestUser || remainingQuota > 0;
     final freeAnalysisValue = isGuestUser ? remainingQuota.toString() : '∞';
     final freeAnalysisLabel = isGuestUser ? 'Sisa Gratis' : 'Akses AI';
@@ -142,7 +142,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              
+
               // Greeting section
               Text(
                 'Halo!',
@@ -161,8 +161,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   remaining: remainingQuota,
                   onUpgradeTap: () => context.go('/login'),
                 ),
-              if (isGuestUser)
-                const SizedBox(height: 24),
+              if (isGuestUser) const SizedBox(height: 24),
 
               // Quick stats (3 stat boxes)
               Row(
@@ -223,12 +222,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     bgColor: AppColors.uploadBg,
                     title: 'Upload\nDokumen',
                     onTap: () async {
+                      // Guest users can only upload up to 5 times
                       if (!canUseFreeAnalysis) {
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'Kuota gratis habis. Silakan masuk untuk melanjutkan analisis.',
+                              'Kuota gratis (5 analisis) sudah habis. Silakan daftar untuk melanjutkan analisis tanpa batas.',
                             ),
                             backgroundColor: AppColors.danger,
                           ),
@@ -249,11 +249,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         return;
                       }
 
-                      messenger.showSnackBar(
-                        const SnackBar(
-                          content: Text('Dokumen berhasil diupload.'),
-                        ),
-                      );
+                      if (isGuestUser) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Dokumen berhasil diupload. Sisa analisis gratis: ${remainingQuota - 1}',
+                            ),
+                          ),
+                        );
+                      } else {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Dokumen berhasil diupload.'),
+                          ),
+                        );
+                      }
                     },
                   ),
                   QuickActionCard(
@@ -262,12 +272,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     bgColor: AppColors.scanBg,
                     title: 'Scan\nDokumen',
                     onTap: () async {
+                      // Guest users can only scan up to 5 times
                       if (!canUseFreeAnalysis) {
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'Kuota gratis habis. Silakan masuk untuk melanjutkan analisis.',
+                              'Kuota gratis (5 analisis) sudah habis. Silakan daftar untuk melanjutkan analisis tanpa batas.',
                             ),
                             backgroundColor: AppColors.danger,
                           ),
@@ -286,11 +297,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         return;
                       }
 
-                      messenger.showSnackBar(
-                        const SnackBar(
-                          content: Text('Dokumen hasil scan berhasil diupload.'),
-                        ),
-                      );
+                      if (isGuestUser) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Dokumen hasil scan berhasil diupload. Sisa analisis gratis: ${remainingQuota - 1}',
+                            ),
+                          ),
+                        );
+                      } else {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content:
+                                Text('Dokumen hasil scan berhasil diupload.'),
+                          ),
+                        );
+                      }
                     },
                   ),
                   QuickActionCard(
@@ -299,16 +321,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     bgColor: AppColors.chatBg,
                     title: 'Tanya AI\nLegalEasy',
                     onTap: () {
-                      if (!canUseFreeAnalysis) {
+                      // Chat AI is only for registered users
+                      if (isGuestUser) {
                         if (!mounted) return;
+                        final router = GoRouter.of(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'Kuota gratis habis. Silakan masuk untuk melanjutkan analisis.',
+                              'Fitur Chat AI hanya tersedia untuk pengguna terdaftar. Silakan daftar untuk melanjutkan.',
                             ),
                             backgroundColor: AppColors.danger,
                           ),
                         );
+                        Future<void>.delayed(const Duration(milliseconds: 500),
+                            () {
+                          if (!mounted) return;
+                          router.go('/register');
+                        });
                         return;
                       }
 
@@ -326,8 +355,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             return;
                           }
                           final document = documents.first;
-                          final encodedTitle = Uri.encodeComponent(document.filename);
-                          context.go('/documents/${document.id}/chat?title=$encodedTitle');
+                          final encodedTitle =
+                              Uri.encodeComponent(document.filename);
+                          context.go(
+                              '/documents/${document.id}/chat?title=$encodedTitle');
                         },
                         loading: () {
                           if (!mounted) return;
@@ -341,7 +372,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Gagal memuat dokumen terbaru. Coba lagi.'),
+                              content: Text(
+                                  'Gagal memuat dokumen terbaru. Coba lagi.'),
                             ),
                           );
                         },
@@ -354,6 +386,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     bgColor: AppColors.historyBg,
                     title: 'Riwayat\nDokumen',
                     onTap: () {
+                      // Document history is only for registered users
+                      if (isGuestUser) {
+                        if (!mounted) return;
+                        final router = GoRouter.of(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Riwayat dokumen hanya tersedia untuk pengguna terdaftar. Silakan daftar untuk menyimpan riwayat.',
+                            ),
+                            backgroundColor: AppColors.danger,
+                          ),
+                        );
+                        Future<void>.delayed(const Duration(milliseconds: 500),
+                            () {
+                          if (!mounted) return;
+                          router.go('/register');
+                        });
+                        return;
+                      }
+
                       context.go('/history');
                     },
                   ),

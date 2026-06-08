@@ -38,7 +38,7 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
   Widget build(BuildContext context) {
     final authUser = ref.watch(authNotifierProvider).value;
     final remainingQuota = ref.watch(guestQuotaProvider).value ?? 5;
-    final isGuest = authUser == null;
+    final isGuest = authUser?.isGuest ?? true;
     final isLocked = isGuest && remainingQuota <= 0;
     final uploadState = ref.watch(documentUploadProvider);
     final isUploading = uploadState.isLoading;
@@ -169,7 +169,8 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
             // Action buttons
             if (isLocked)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Text(
                   'Kuota gratis habis. Silakan masuk untuk melanjutkan analisis.',
                   style: AppTextStyles.bodySmall.copyWith(
@@ -203,7 +204,8 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: isUploading || isLocked ? null : _handlePrimaryAction,
+                      onPressed:
+                          isUploading || isLocked ? null : _handlePrimaryAction,
                       child: isUploading
                           ? const SizedBox(
                               height: 18,
@@ -309,9 +311,11 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
           await ref.read(documentUploadProvider.notifier).uploadDocument(file);
 
       final authUser = ref.read(authNotifierProvider).value;
-      if (authUser == null) {
+      if (authUser?.isGuest ?? true) {
         try {
-          await ref.read(guestQuotaProvider.notifier).consumeAnalysis(isGuest: true);
+          await ref
+              .read(guestQuotaProvider.notifier)
+              .consumeAnalysis(isGuest: true);
         } catch (_) {
           // If quota persistence fails, continue without blocking upload completion.
         }
@@ -319,12 +323,20 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
 
       if (!mounted) return;
       Navigator.of(context).pop(uploadedDocument);
-    } on Exception {
+    } on Exception catch (error) {
       if (!mounted) return;
       messenger.showSnackBar(
-        const SnackBar(content: Text('Upload gagal. Silakan coba lagi.')),
+        SnackBar(content: Text(_formatUploadError(error))),
       );
     }
+  }
+
+  String _formatUploadError(Exception error) {
+    final message = error.toString().replaceFirst('Exception: ', '').trim();
+    if (message.isEmpty) {
+      return 'Upload gagal. Silakan coba lagi.';
+    }
+    return message;
   }
 
   /// Scan preview dengan corner brackets dan scan line

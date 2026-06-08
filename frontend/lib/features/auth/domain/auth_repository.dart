@@ -15,5 +15,7 @@ abstract class AuthRepository {
 
   Future<AuthUser> loginWithGoogle();
 
+  Future<AuthUser> loginAnonymously();
+
   Future<void> logout();
 }

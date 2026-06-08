@@ -26,8 +26,9 @@ class DocumentService {
         if (data['success'] == true && data['data'] != null) {
           final payload = data['data'];
           // Handle paginated response { items: [...] } or flat array
-          final List<dynamic> documentsList =
-              payload is Map ? (payload['items'] as List<dynamic>? ?? []) : payload as List<dynamic>;
+          final List<dynamic> documentsList = payload is Map
+              ? (payload['items'] as List<dynamic>? ?? [])
+              : payload as List<dynamic>;
           return documentsList
               .map((doc) => Document.fromJson(doc as Map<String, dynamic>))
               .toList();
@@ -55,8 +56,9 @@ class DocumentService {
         if (data['success'] == true && data['data'] != null) {
           final payload = data['data'];
           // Handle paginated response { items: [...] } or flat array
-          final List<dynamic> documentsList =
-              payload is Map ? (payload['items'] as List<dynamic>? ?? []) : payload as List<dynamic>;
+          final List<dynamic> documentsList = payload is Map
+              ? (payload['items'] as List<dynamic>? ?? [])
+              : payload as List<dynamic>;
           return documentsList
               .map((doc) => Document.fromJson(doc as Map<String, dynamic>))
               .toList();
@@ -222,7 +224,14 @@ class DocumentService {
         );
       case DioExceptionType.badResponse:
         final statusCode = error.response?.statusCode;
-        final message = error.response?.data['message'] as String?;
+        final responseData = error.response?.data;
+        final detail = responseData is Map ? responseData['detail'] : null;
+        final apiMessage = responseData is Map ? responseData['message'] : null;
+        final message = detail is String
+            ? detail
+            : apiMessage is String
+                ? apiMessage
+                : null;
         return Exception(
             'Error: ${message ?? 'Request gagal (Code: $statusCode)'}');
       case DioExceptionType.cancel:
