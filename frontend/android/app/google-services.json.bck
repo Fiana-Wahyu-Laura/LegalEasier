@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "942040795881",
+    "project_id": "legaleasier-15871",
+    "storage_bucket": "legaleasier-15871.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942040795881:android:2994a5709c34f0b1edbe78",
+        "android_client_info": {
+          "package_name": "com.example.legaleasier"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "942040795881-u3ec6kb8qq766uhub28fn7k6i6nocf4q.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.legaleasier",
+            "certificate_hash": "5a59003c3259da499900901d448d3800cc68c01a"
+          }
+        },
+        {
+          "client_id": "942040795881-7lejp5o6jmb95j5065ag5gfv2umjt05k.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD09d3fvP4GxMr0SC-MVRfF5ZF47EZLWtg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "942040795881-7lejp5o6jmb95j5065ag5gfv2umjt05k.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "942040795881-c54og28abm4vr5stfe7mui9vsc9ufpqf.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.legaleasier"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

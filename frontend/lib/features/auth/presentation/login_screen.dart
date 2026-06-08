@@ -77,6 +77,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _signInAnonymously() async {
+    try {
+      await ref.read(authNotifierProvider.notifier).loginAnonymously();
+      if (!mounted) return;
+      context.go('/home');
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Gagal masuk sebagai tamu. Silakan coba lagi.',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    }
+  }
+
   String _friendlyErrorMessage(Object error) {
     final message = error.toString().toLowerCase();
     if (message.contains('wrong-password') ||
@@ -303,12 +322,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton(
-                        onPressed: isLoading
-                            ? null
-                            : () {
-                                if (!mounted) return;
-                                context.go('/home');
-                              },
+                        onPressed: isLoading ? null : _signInAnonymously,
                         child: const Text('Lanjutkan sebagai tamu'),
                       ),
                     ],

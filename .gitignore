@@ -33,6 +33,7 @@ frontend/legaleasier.iml
 
 # ===== Firebase credentials — NEVER commit =====
 **/google-services.json
+**/google-services.json.bck
 **/GoogleService-Info.plist
 **/firebase-credentials.json
 **/firebase_options.dart

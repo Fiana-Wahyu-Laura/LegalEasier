@@ -42,11 +42,9 @@ async def _get_or_create_user_from_firebase_token(
         return user
 
     if not email:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token: missing email claim",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        email = f"guest_{firebase_uid}@legaleasier.local"
+        if not display_name:
+            display_name = "Tamu"
 
     stmt = select(User).where(User.email == email)
     result = await db.execute(stmt)
@@ -93,6 +91,7 @@ async def get_current_user(
     
     Args:
         authorization: Authorization header (expected format: "Bearer <token>")
+        request: FastAPI request object
         db: Database session
     
     Returns:
@@ -101,15 +100,20 @@ async def get_current_user(
     Raises:
         HTTPException: 401 if no token, invalid token, or user not found in DB
     """
+    authorization = request.headers.get("Authorization")
     if not authorization:
+        with open("deps_error.log", "a") as f:
+            f.write("Error: Missing authorization header\n")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header missing",
+            detail="Missing authorization header",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
     # Parse Bearer token
     if not authorization.startswith("Bearer "):
+        with open("deps_error.log", "a") as f:
+            f.write(f"Error: Invalid format - {authorization}\n")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authorization header format. Expected 'Bearer <token>'",
@@ -162,6 +166,8 @@ async def get_current_user(
         raise
     except Exception as e:
         logger.error("Error verifying Firebase token: %s", e)
+        with open("deps_error.log", "a") as f:
+            f.write(f"Error: {repr(e)}\n")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",

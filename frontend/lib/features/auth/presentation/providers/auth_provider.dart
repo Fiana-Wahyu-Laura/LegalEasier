@@ -54,6 +54,17 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
     }
   }
 
+  Future<void> loginAnonymously() async {
+    state = const AsyncValue.loading();
+    try {
+      final user = await _repository.loginAnonymously();
+      state = AsyncValue.data(user);
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+      rethrow;
+    }
+  }
+
   Future<void> logout() async {
     state = const AsyncValue.loading();
     try {

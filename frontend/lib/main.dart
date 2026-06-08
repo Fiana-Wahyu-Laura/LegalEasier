@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
@@ -22,21 +23,22 @@ Future<void> main() async {
     // In production, send to analytics/monitoring here
   };
 
+  // Modern async error handler instead of runZonedGuarded
+  PlatformDispatcher.instance.onError = (error, stack) {
+    if (kDebugMode) {
+      debugPrint('Uncaught async error: $error');
+      debugPrintStack(stackTrace: stack);
+    }
+    return true;
+  };
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Run app inside a guarded zone to catch uncaught async errors
-  runZonedGuarded(() {
-    runApp(const ProviderScope(child: LegalEasierApp()));
-  }, (error, stack) {
-    // Log uncaught errors from the zone. Replace with crash reporting if available.
-    if (kDebugMode) {
-      debugPrint('Uncaught zone error: $error');
-      debugPrintStack(stackTrace: stack);
-    }
-  });
+  runApp(const ProviderScope(child: LegalEasierApp()));
 }
+
 
 class LegalEasierApp extends StatelessWidget {
   const LegalEasierApp({super.key});
