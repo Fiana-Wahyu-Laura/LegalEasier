@@ -79,11 +79,56 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _signInAnonymously() async {
     try {
+      // Perform anonymous login
       await ref.read(authNotifierProvider.notifier).loginAnonymously();
+      if (!mounted) return;
+
+      // Give Firebase a moment to ensure token is fully ready
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+
+      // Verify token is available before navigation
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        try {
+          final idToken = await user.getIdToken(forceRefresh: true);
+          if (idToken.isEmpty) {
+            throw Exception('Token is empty');
+          }
+          debugPrint('[LoginScreen] Anonymous login successful - user: ${user.uid}, token length: ${idToken.length}');
+        } catch (e) {
+          debugPrint('[LoginScreen] ERROR: Could not get ID token after login: $e');
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Token tidak tersedia. Silakan coba lagi.',
+                style: TextStyle(color: Colors.white),
+              ),
+              backgroundColor: AppColors.danger,
+            ),
+          );
+          return;
+        }
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Gagal masuk sebagai tamu. Silakan coba lagi.',
+              style: TextStyle(color: Colors.white),
+            ),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+        return;
+      }
+
       if (!mounted) return;
       context.go('/home');
     } catch (error) {
       if (!mounted) return;
+      debugPrint('[LoginScreen] Anonymous login error: $error');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text(

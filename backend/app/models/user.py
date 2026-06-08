@@ -16,6 +16,7 @@ class User(Base):
     display_name: str | None = Column(String(255), nullable=True)
     hashed_password: str | None = Column(String(255), nullable=True)
     is_active: bool = Column(Boolean, default=True, nullable=False)
+    device_id: str | None = Column(String(255), index=True, nullable=True)  # For linking anonymous sessions
     created_at: datetime = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

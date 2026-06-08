@@ -98,7 +98,7 @@ async def verify_firebase_token(token: str) -> dict:
 
     # Mock mode — skip real verification, return mock claims
     if app == MOCK_MODE:
-        logger.debug("MOCK_MODE: skipping Firebase token verification")
+        logger.debug("verify_firebase_token: MOCK_MODE - returning mock claims (no real verification)")
         return {
             "uid": f"mock-uid-{token[:8]}",
             "email": "dev@legaleasier.local",
@@ -114,12 +114,16 @@ async def verify_firebase_token(token: str) -> dict:
     )
 
     try:
+        logger.debug("verify_firebase_token: Attempting real Firebase verification (token length=%d)", len(token))
         decoded_token = auth.verify_id_token(token, app=app)
+        logger.debug("verify_firebase_token: Token verified successfully - uid=%s", decoded_token.get("uid"))
         return decoded_token
 
     except (InvalidIdTokenError, ExpiredIdTokenError, ExpiredSessionCookieError) as e:
-        logger.error("Firebase token verification failed: %s", e)
+        logger.error("verify_firebase_token: Firebase token verification failed - error=%s (%s)", 
+                     str(e), type(e).__name__)
         raise
     except Exception as e:
-        logger.error("Unexpected error during Firebase token verification: %s", e)
+        logger.error("verify_firebase_token: Unexpected error during Firebase token verification - error=%s (%s)", 
+                     str(e), type(e).__name__)
         raise
