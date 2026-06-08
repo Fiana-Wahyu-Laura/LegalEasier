@@ -7,7 +7,7 @@ import uuid
 from collections.abc import AsyncGenerator
 
 from fastapi import Depends, Header, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.firebase import is_mock_mode, verify_firebase_token
@@ -49,9 +49,18 @@ async def _get_or_create_user_from_firebase_token(
 
     if user:
         logger.info("Found existing user with Firebase UID: %s", firebase_uid)
+        changed = False
+        if email and user.is_guest and user.email != email:
+            user.email = email
+            changed = True
+        if display_name and not user.display_name:
+            user.display_name = display_name
+            changed = True
         # Update device_id if provided and not already set
         if device_id and not user.device_id:
             user.device_id = device_id
+            changed = True
+        if changed:
             await db.commit()
             await db.refresh(user)
             logger.info("Linked device_id to existing user: %s → %s", firebase_uid, device_id)
@@ -61,7 +70,16 @@ async def _get_or_create_user_from_firebase_token(
     # This allows restoring previous anonymous session
     if device_id and not email:  # Guest user detection
         logger.debug("Checking for existing guest session with device_id: %s", device_id)
-        stmt = select(User).where(User.device_id == device_id).where(User.firebase_uid.ilike("anonymous:%"))
+        stmt = (
+            select(User)
+            .where(User.device_id == device_id)
+            .where(
+                or_(
+                    User.firebase_uid.ilike("anonymous:%"),
+                    User.email.ilike("guest_%@legaleasier.local"),
+                )
+            )
+        )
         result = await db.execute(stmt)
         existing_guest = result.scalar_one_or_none()
         

@@ -19,6 +19,7 @@ from app.api.deps import get_current_user, get_db
 from app.models.document import Document
 from app.schemas.auth import AuthUser
 from app.schemas.common import StandardResponse
+from app.services.guest_quota import consume_guest_quota, ensure_guest_quota_available
 from app.services.storage import get_storage_service, StorageService
 from app.services.nlp_client import get_nlp_client, NLPServiceClient
 from app.schemas.document import DocumentListItem, DocumentResponse, DocumentStatusResponse, DocumentTextResponse
@@ -79,6 +80,9 @@ async def upload_document(
             detail=f"File too large. Max size: {MAX_FILE_SIZE / 1024 / 1024} MB",
         )
 
+    if current_user.is_guest:
+        await ensure_guest_quota_available(db, current_user.id)
+
     # Create document record
     doc_id = uuid.uuid4()
     try:
@@ -100,6 +104,8 @@ async def upload_document(
             owner_id=current_user.id,
         )
         db.add(document)
+        if current_user.is_guest:
+            await consume_guest_quota(db, current_user.id)
         await db.commit()
         await db.refresh(document)
 

@@ -88,7 +88,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final remainingQuota = quotaState.value ?? 5;
     final userName = _buildUserName(authUser);
     final userInitial = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
-    final isGuestUser = authUser == null;
+    final isGuestUser = authUser?.isGuest ?? true;
     final canUseFreeAnalysis = !isGuestUser || remainingQuota > 0;
     final freeAnalysisValue = isGuestUser ? remainingQuota.toString() : '∞';
     final freeAnalysisLabel = isGuestUser ? 'Sisa Gratis' : 'Akses AI';
@@ -142,7 +142,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              
+
               // Greeting section
               Text(
                 'Halo!',
@@ -161,8 +161,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   remaining: remainingQuota,
                   onUpgradeTap: () => context.go('/login'),
                 ),
-              if (isGuestUser)
-                const SizedBox(height: 24),
+              if (isGuestUser) const SizedBox(height: 24),
 
               // Quick stats (3 stat boxes)
               Row(
@@ -309,7 +308,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       } else {
                         messenger.showSnackBar(
                           const SnackBar(
-                            content: Text('Dokumen hasil scan berhasil diupload.'),
+                            content:
+                                Text('Dokumen hasil scan berhasil diupload.'),
                           ),
                         );
                       }
@@ -324,6 +324,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       // Chat AI is only for registered users
                       if (isGuestUser) {
                         if (!mounted) return;
+                        final router = GoRouter.of(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
@@ -332,9 +333,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             backgroundColor: AppColors.danger,
                           ),
                         );
-                        Future<void>.delayed(const Duration(milliseconds: 500), () {
+                        Future<void>.delayed(const Duration(milliseconds: 500),
+                            () {
                           if (!mounted) return;
-                          context.go('/register');
+                          router.go('/register');
                         });
                         return;
                       }
@@ -353,8 +355,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             return;
                           }
                           final document = documents.first;
-                          final encodedTitle = Uri.encodeComponent(document.filename);
-                          context.go('/documents/${document.id}/chat?title=$encodedTitle');
+                          final encodedTitle =
+                              Uri.encodeComponent(document.filename);
+                          context.go(
+                              '/documents/${document.id}/chat?title=$encodedTitle');
                         },
                         loading: () {
                           if (!mounted) return;
@@ -368,7 +372,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Gagal memuat dokumen terbaru. Coba lagi.'),
+                              content: Text(
+                                  'Gagal memuat dokumen terbaru. Coba lagi.'),
                             ),
                           );
                         },
@@ -384,6 +389,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       // Document history is only for registered users
                       if (isGuestUser) {
                         if (!mounted) return;
+                        final router = GoRouter.of(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
@@ -392,13 +398,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             backgroundColor: AppColors.danger,
                           ),
                         );
-                        Future<void>.delayed(const Duration(milliseconds: 500), () {
+                        Future<void>.delayed(const Duration(milliseconds: 500),
+                            () {
                           if (!mounted) return;
-                          context.go('/register');
+                          router.go('/register');
                         });
                         return;
                       }
-                      
+
                       context.go('/history');
                     },
                   ),

@@ -8,7 +8,8 @@ class FirebaseAuthRepository implements AuthRepository {
   final FirebaseAuth _firebaseAuth;
   final GoogleSignIn _googleSignIn;
 
-  FirebaseAuthRepository({FirebaseAuth? firebaseAuth, GoogleSignIn? googleSignIn})
+  FirebaseAuthRepository(
+      {FirebaseAuth? firebaseAuth, GoogleSignIn? googleSignIn})
       : _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance,
         _googleSignIn = googleSignIn ?? GoogleSignIn();
 
@@ -20,6 +21,7 @@ class FirebaseAuthRepository implements AuthRepository {
       uid: user.uid,
       email: user.email,
       displayName: user.displayName,
+      isGuest: user.isAnonymous,
     );
   }
 
@@ -40,11 +42,13 @@ class FirebaseAuthRepository implements AuthRepository {
       uid: user.uid,
       email: user.email,
       displayName: user.displayName,
+      isGuest: user.isAnonymous,
     );
   }
 
   @override
-  Future<AuthUser> registerWithEmailPassword(String email, String password) async {
+  Future<AuthUser> registerWithEmailPassword(
+      String email, String password) async {
     final credentials = await _firebaseAuth.createUserWithEmailAndPassword(
       email: email,
       password: password,
@@ -60,6 +64,7 @@ class FirebaseAuthRepository implements AuthRepository {
       uid: user.uid,
       email: user.email,
       displayName: user.displayName,
+      isGuest: user.isAnonymous,
     );
   }
 
@@ -92,6 +97,7 @@ class FirebaseAuthRepository implements AuthRepository {
       uid: user.uid,
       email: user.email,
       displayName: user.displayName,
+      isGuest: user.isAnonymous,
     );
   }
 
@@ -109,6 +115,7 @@ class FirebaseAuthRepository implements AuthRepository {
       uid: user.uid,
       email: user.email,
       displayName: user.displayName,
+      isGuest: user.isAnonymous,
     );
   }
 
