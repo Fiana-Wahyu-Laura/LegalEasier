@@ -100,10 +100,8 @@ async def get_current_user(
     Raises:
         HTTPException: 401 if no token, invalid token, or user not found in DB
     """
-    authorization = request.headers.get("Authorization")
     if not authorization:
-        with open("deps_error.log", "a") as f:
-            f.write("Error: Missing authorization header\n")
+        logger.error("Error: Missing authorization header")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing authorization header",
@@ -112,8 +110,7 @@ async def get_current_user(
     
     # Parse Bearer token
     if not authorization.startswith("Bearer "):
-        with open("deps_error.log", "a") as f:
-            f.write(f"Error: Invalid format - {authorization}\n")
+        logger.error("Error: Invalid authorization format - %s", authorization)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authorization header format. Expected 'Bearer <token>'",
@@ -166,8 +163,6 @@ async def get_current_user(
         raise
     except Exception as e:
         logger.error("Error verifying Firebase token: %s", e)
-        with open("deps_error.log", "a") as f:
-            f.write(f"Error: {repr(e)}\n")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
