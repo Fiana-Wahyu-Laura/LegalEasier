@@ -1,17 +1,16 @@
 """Add device_id column to users table for anonymous session linking.
 
 Revision ID: add_device_id_to_users
-Revises: 
+Revises: 20260526_0006
 Create Date: 2026-06-09 12:00:00.000000
 
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'add_device_id_to_users'
-down_revision = None
+down_revision = '20260526_0006'
 branch_labels = None
 depends_on = None
 

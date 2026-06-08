@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -91,8 +92,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         try {
-          final idToken = await user.getIdToken(forceRefresh: true);
-          if (idToken.isEmpty) {
+          final idToken = await user.getIdToken();
+          if (idToken == null || idToken.isEmpty) {
             throw Exception('Token is empty');
           }
           debugPrint('[LoginScreen] Anonymous login successful - user: ${user.uid}, token length: ${idToken.length}');

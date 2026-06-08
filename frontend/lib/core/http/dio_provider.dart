@@ -32,9 +32,9 @@ final dioProvider = Provider<Dio>((ref) {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
           try {
-            // Force refresh to ensure token is valid and fresh
-            final idToken = await user.getIdToken(forceRefresh: true);
-            if (idToken.isEmpty) {
+            // Get fresh ID token for API authentication
+            final idToken = await user.getIdToken();
+            if (idToken == null || idToken.isEmpty) {
               if (kDebugMode) {
                 debugPrint('[Auth] WARNING: ID token is empty for user: ${user.uid}');
               }
