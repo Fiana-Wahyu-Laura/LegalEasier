@@ -14,6 +14,9 @@ class AnalysisService {
   AnalysisService({required this.dio});
 
   /// GET /api/v1/documents/:id/analysis
+  ///
+  /// Returns null when the document is still being processed so the UI
+  /// keeps polling. Only throws on truly unrecoverable errors.
   Future<AnalysisResult?> fetchAnalysis(String documentId) async {
     try {
       final response = await dio.get(
@@ -27,17 +30,28 @@ class AnalysisService {
         }
         return null;
       }
-      throw Exception('Failed to fetch analysis: ${response.statusCode}');
+      // Unexpected success code — treat as still processing
+      return null;
     } on DioException catch (e) {
-      // 202 = still processing, 404 = not found
       final code = e.response?.statusCode;
+      // 202 = still processing, 404 = not found → keep polling
       if (code == 202 || code == 404) {
         return null;
       }
-      final message = e.response?.data?['message'] as String?;
-      throw Exception(
-        message ?? 'Gagal memuat analisis dokumen (Code: $code)',
-      );
+      // 400 (failed processing) or 5xx (server error) — keep polling too;
+      // the backend may recover when NLP finishes or retries succeed.
+      // Only throw on 401/403 (auth), or total network failure (no response).
+      if (code == 401 || code == 403) {
+        throw Exception('Akses ditolak. Silakan login kembali.');
+      }
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        // Transient network error — return null so polling continues
+        return null;
+      }
+      // All other errors (400, 500, etc.) — also keep polling
+      return null;
     }
   }
 }

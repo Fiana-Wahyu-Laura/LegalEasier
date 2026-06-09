@@ -33,10 +33,12 @@ class _DocumentAnalysisScreenState
   Timer? _elapsedTimer;
   DateTime? _processingStartAt;
   int _elapsedSeconds = 0;
+  int _consecutiveErrors = 0;
   late AnimationController _pulseController;
 
   static const _pollInterval = Duration(seconds: 3);
   static const _elapsedTick = Duration(seconds: 1);
+  static const _maxConsecutiveErrors = 5;
 
   static const _processingSteps = [
     _ProcessingStep('Membaca teks dokumen', Icons.document_scanner_outlined),
@@ -111,13 +113,20 @@ class _DocumentAnalysisScreenState
         _startPolling();
         _startElapsedTimer();
       } else {
+        _consecutiveErrors = 0;
         _cancelPolling();
         _cancelElapsedTimer();
       }
     });
     if (analysisAsyncValue.hasError) {
-      _cancelPolling();
-      _cancelElapsedTimer();
+      _consecutiveErrors++;
+      if (_consecutiveErrors >= _maxConsecutiveErrors) {
+        _cancelPolling();
+        _cancelElapsedTimer();
+      }
+      // else: keep polling, skip showing error until threshold reached
+    } else {
+      _consecutiveErrors = 0;
     }
 
     final chatFab = analysisAsyncValue.maybeWhen(
@@ -152,7 +161,14 @@ class _DocumentAnalysisScreenState
       floatingActionButton: chatFab,
       body: analysisAsyncValue.when(
         loading: () => _buildInitialLoading(),
-        error: (error, stackTrace) => _buildErrorState(),
+        error: (error, stackTrace) {
+          // Only show fatal error after consecutive failures
+          if (_consecutiveErrors >= _maxConsecutiveErrors) {
+            return _buildErrorState();
+          }
+          // Still under threshold — keep showing processing UI
+          return _buildProcessingState();
+        },
         data: (analysis) {
           if (analysis == null) {
             return _buildProcessingState();
