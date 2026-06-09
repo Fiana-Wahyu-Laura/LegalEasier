@@ -1,19 +1,46 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:legaleasier/core/theme/app_theme.dart';
+import 'package:legaleasier/features/auth/presentation/providers/auth_provider.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen> {
+  bool _isTryingAsGuest = false;
+
   void _goToOnboarding() {
     if (!mounted) return;
     context.go('/onboarding');
+  }
+
+  Future<void> _tryAsGuest() async {
+    setState(() => _isTryingAsGuest = true);
+    try {
+      await ref.read(authNotifierProvider.notifier).loginAnonymously();
+      if (!mounted) return;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        context.go('/home');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal masuk sebagai tamu. Silakan coba lagi.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isTryingAsGuest = false);
+    }
   }
 
   Widget _buildFeatureItem({
@@ -246,6 +273,34 @@ class _SplashScreenState extends State<SplashScreen> {
                           ),
                         ),
                         child: const Text('Mulai Sekarang'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isTryingAsGuest ? null : _tryAsGuest,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withValues(alpha: 0.18),
+                          foregroundColor: AppColors.white,
+                          minimumSize: const Size.fromHeight(50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          textStyle: AppTextStyles.btnSmall.copyWith(
+                            color: AppColors.white,
+                          ),
+                        ),
+                        child: _isTryingAsGuest
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Coba Gratis — 5 Analisis'),
                       ),
                     ),
                     const SizedBox(height: 12),

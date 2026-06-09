@@ -61,7 +61,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _signInWithGoogle() async {
     try {
-      await ref.read(authNotifierProvider.notifier).loginWithGoogle();
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null && currentUser.isAnonymous) {
+        // Convert anonymous account to permanent Google account, preserving data
+        await ref.read(authNotifierProvider.notifier).linkAnonymousToGoogle();
+      } else {
+        await ref.read(authNotifierProvider.notifier).loginWithGoogle();
+      }
       if (!mounted) return;
       context.go('/home');
     } catch (error) {

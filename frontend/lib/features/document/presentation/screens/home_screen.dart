@@ -23,6 +23,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _isSigningOut = false;
+  bool _hasShownLimitGate = false;
 
   Widget _buildAvatar(String userInitial) {
     return Container(
@@ -82,16 +83,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authUser = ref.watch(authNotifierProvider).value;
+    final authState = ref.watch(authNotifierProvider);
+    final authUser = authState.value;
+    final isAuthLoading = authState.isLoading;
     final quotaState = ref.watch(guestQuotaProvider);
     final recentDocumentsAsync = ref.watch(recentDocumentsProvider);
     final remainingQuota = quotaState.value ?? 5;
-    final userName = _buildUserName(authUser);
+
+    // Fix #10: don't treat loading state as guest — wait for auth to resolve
+    final isGuestUser = isAuthLoading ? false : (authUser?.isGuest ?? false);
+    final userName = isAuthLoading ? '' : _buildUserName(authUser);
     final userInitial = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
-    final isGuestUser = authUser?.isGuest ?? true;
     final canUseFreeAnalysis = !isGuestUser || remainingQuota > 0;
     final freeAnalysisValue = isGuestUser ? remainingQuota.toString() : '∞';
     final freeAnalysisLabel = isGuestUser ? 'Sisa Gratis' : 'Akses AI';
+
+    // Fix #6: auto-redirect to limit gate when guest quota hits 0
+    if (isGuestUser && remainingQuota <= 0 && !_hasShownLimitGate && !isAuthLoading) {
+      _hasShownLimitGate = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.go('/limit-gate');
+        }
+      });
+    }
 
     return Scaffold(
       backgroundColor: AppColors.pageBackground,
@@ -338,6 +353,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     iconColor: AppColors.chatIcon,
                     bgColor: AppColors.chatBg,
                     title: 'Tanya AI\nLegalEasy',
+                    locked: isGuestUser,
                     onTap: () {
                       // Chat AI is only for registered users
                       if (isGuestUser) {
@@ -403,6 +419,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     iconColor: AppColors.historyIcon,
                     bgColor: AppColors.historyBg,
                     title: 'Riwayat\nDokumen',
+                    locked: isGuestUser,
                     onTap: () {
                       // Document history is only for registered users
                       if (isGuestUser) {

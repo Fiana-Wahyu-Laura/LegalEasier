@@ -1,19 +1,23 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 import 'package:legaleasier/core/theme/app_theme.dart';
+import 'package:legaleasier/features/auth/presentation/providers/auth_provider.dart';
 
-class OnboardingScreen extends StatefulWidget {
+class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
   @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
+  ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  bool _isTryingAsGuest = false;
 
   static const List<Map<String, Object>> _pages = [
     {
@@ -45,6 +49,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
+  Future<void> _tryAsGuest() async {
+    setState(() => _isTryingAsGuest = true);
+    try {
+      await ref.read(authNotifierProvider.notifier).loginAnonymously();
+      if (!mounted) return;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        context.go('/home');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal masuk sebagai tamu. Silakan coba lagi.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isTryingAsGuest = false);
+    }
+  }
+
   void _nextPage() {
     if (_currentPage < _pages.length - 1) {
       _pageController.nextPage(
@@ -54,7 +80,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       return;
     }
 
-    context.go('/login');
+    // Last page — try as guest for instant access
+    _tryAsGuest();
   }
 
   Widget _buildHeroCard(Map<String, Object> page) {
@@ -157,7 +184,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () => context.go('/login'),
+                  onPressed: _isTryingAsGuest ? null : _tryAsGuest,
                   child: Text(
                     'Lewati',
                     style: AppTextStyles.navLabel.copyWith(
@@ -200,12 +227,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _nextPage,
-                  child: Text(
-                    _currentPage < _pages.length - 1
-                        ? 'Selanjutnya'
-                        : 'Mulai Sekarang',
-                  ),
+                  onPressed: _isTryingAsGuest
+                      ? null
+                      : (_currentPage < _pages.length - 1 ? _nextPage : _tryAsGuest),
+                  child: _isTryingAsGuest
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          _currentPage < _pages.length - 1
+                              ? 'Selanjutnya'
+                              : 'Coba Gratis — 5 Analisis',
+                        ),
                 ),
               ),
               const SizedBox(height: 12),

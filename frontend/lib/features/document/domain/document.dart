@@ -7,6 +7,7 @@ class Document {
   final String? riskLevel;  // "Tinggi", "Sedang", "Rendah", "Aman"
   final bool hasAnalysis;
   final String? fileType;  // pdf, jpg, png, docx
+  final int? remainingQuota;  // only present in upload response for guest users
 
   Document({
     required this.id,
@@ -16,6 +17,7 @@ class Document {
     this.riskLevel,
     this.hasAnalysis = false,
     this.fileType,
+    this.remainingQuota,
   });
 
   /// Factory constructor untuk mapping dari JSON response backend
@@ -28,6 +30,7 @@ class Document {
       riskLevel: json['risk_level'] as String? ?? _calculateRiskLevel(json['risk_score'] as int?),
       hasAnalysis: json['has_analysis'] as bool? ?? (json['status'] == 'done'),
       fileType: json['file_type'] as String?,
+      remainingQuota: json['remaining_quota'] as int?,
     );
   }
 
@@ -61,6 +64,7 @@ class Document {
     String? riskLevel,
     bool? hasAnalysis,
     String? fileType,
+    int? remainingQuota,
   }) {
     return Document(
       id: id ?? this.id,
@@ -70,6 +74,7 @@ class Document {
       riskLevel: riskLevel ?? this.riskLevel,
       hasAnalysis: hasAnalysis ?? this.hasAnalysis,
       fileType: fileType ?? this.fileType,
+      remainingQuota: remainingQuota ?? this.remainingQuota,
     );
   }
 

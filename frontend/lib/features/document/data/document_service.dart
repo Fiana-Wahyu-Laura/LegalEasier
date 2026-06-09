@@ -207,6 +207,25 @@ class DocumentService {
     }
   }
 
+  /// GET /api/v1/guest/quota
+  /// Fetch server-authoritative guest quota (single source of truth).
+  /// Returns a map with keys: is_guest, remaining, total.
+  Future<Map<String, dynamic>> fetchGuestQuota() async {
+    try {
+      final response = await dio.get('$_apiPrefix/guest/quota');
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        if (data['success'] == true && data['data'] != null) {
+          return data['data'] as Map<String, dynamic>;
+        }
+      }
+      throw Exception('Failed to fetch guest quota: ${response.statusCode}');
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
   /// Handle Dio errors dengan pesan yang user-friendly
   Exception _handleDioError(DioException error) {
     switch (error.type) {

@@ -20,7 +20,7 @@ from app.api.deps import get_current_user, get_db
 from app.models.document import Document
 from app.schemas.auth import AuthUser
 from app.schemas.common import StandardResponse
-from app.services.guest_quota import consume_guest_quota, ensure_guest_quota_available
+from app.services.guest_quota import consume_guest_quota, ensure_guest_quota_available, refund_guest_quota
 from app.services.storage import get_storage_service, StorageService, S3StorageService
 from app.services.nlp_client import get_nlp_client, NLPServiceClient
 from app.schemas.document import DocumentListItem, DocumentResponse, DocumentStatusResponse, DocumentTextResponse
@@ -105,18 +105,29 @@ async def upload_document(
             owner_id=current_user.id,
         )
         db.add(document)
+
+        # For guest users: check and consume one quota slot at upload time.
+        # If NLP fails later, the background task will refund the slot.
+        remaining_quota: int | None = None
         if current_user.is_guest:
-            await consume_guest_quota(db, current_user.id)
+            remaining_quota = await consume_guest_quota(db, current_user.id)
+
         await db.commit()
         await db.refresh(document)
 
-        # Schedule OCR processing (background task)
-        background_tasks.add_task(process_document_ocr, doc_id, file.filename, nlp_client)
+        # Schedule OCR processing (background task) — pass owner_id for potential refund
+        background_tasks.add_task(
+            process_document_ocr, doc_id, file.filename, nlp_client, current_user.id, current_user.is_guest,
+        )
 
         doc_response = DocumentResponse.model_validate(document)
+        response_data = doc_response.model_dump(mode="json")
+        if remaining_quota is not None:
+            response_data["remaining_quota"] = remaining_quota
+
         return StandardResponse(
             success=True,
-            data=doc_response.model_dump(mode="json"),
+            data=response_data,
             message="Document uploaded successfully.",
         )
 
@@ -433,6 +444,8 @@ async def process_document_ocr(
     document_id: uuid.UUID,
     filename: str,
     nlp_client: NLPServiceClient,
+    owner_id: uuid.UUID | None = None,
+    is_guest: bool = False,
 ) -> None:
     """
     Background task to process document via NLP pipeline.
@@ -440,7 +453,7 @@ async def process_document_ocr(
     Fetches file content from PostgreSQL BYTEA (legacy) or S3/MinIO,
     sends to NLP service, and updates document status.  Retry policy:
     max 3 attempts with exponential backoff (2s, 4s).  On final failure
-    marks status=failed.
+    marks status=failed and refunds guest quota if applicable.
     """
     import asyncio
 
@@ -533,7 +546,7 @@ async def process_document_ocr(
             logger.info("Retrying NLP for document %s in %ds...", document_id, delay)
             await asyncio.sleep(delay)
 
-    # All retries exhausted — mark as failed
+    # All retries exhausted — mark as failed and refund guest quota
     logger.error(
         "All %d NLP attempts failed for document %s. Marking as failed.",
         MAX_NLP_RETRIES, document_id,
@@ -546,5 +559,19 @@ async def process_document_ocr(
             if document:
                 document.status = "failed"
                 await db.commit()
+
+            # Refund guest quota — the user didn't get a usable analysis
+            if is_guest and owner_id:
+                try:
+                    refunded = await refund_guest_quota(db, owner_id)
+                    logger.info(
+                        "Refunded guest quota for user %s after NLP failure (doc %s). Remaining: %d",
+                        owner_id, document_id, refunded,
+                    )
+                except Exception as refund_exc:
+                    logger.error(
+                        "Failed to refund guest quota for user %s (doc %s): %s",
+                        owner_id, document_id, refund_exc,
+                    )
     except Exception as exc:
         logger.error("Failed to mark document %s as failed: %s", document_id, exc)
