@@ -23,6 +23,19 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _isSigningOut = false;
+  bool _hasShownLimitGate = false;
+
+  Future<void> _cleanupGuestAndLeave() async {
+    try {
+      await ref
+          .read(documentRepositoryProvider)
+          .deleteGuestDocuments();
+    } catch (_) {
+      // Non-blocking.
+    }
+    if (!mounted) return;
+    context.go('/login');
+  }
 
   Widget _buildAvatar(String userInitial) {
     return Container(
@@ -82,16 +95,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authUser = ref.watch(authNotifierProvider).value;
+    final authState = ref.watch(authNotifierProvider);
+    final authUser = authState.value;
+    final isAuthLoading = authState.isLoading;
     final quotaState = ref.watch(guestQuotaProvider);
     final recentDocumentsAsync = ref.watch(recentDocumentsProvider);
     final remainingQuota = quotaState.value ?? 5;
-    final userName = _buildUserName(authUser);
+
+    // Fix #10: don't treat loading state as guest — wait for auth to resolve
+    final isGuestUser = isAuthLoading ? false : (authUser?.isGuest ?? false);
+    final userName = isAuthLoading ? '' : _buildUserName(authUser);
     final userInitial = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
-    final isGuestUser = authUser?.isGuest ?? true;
     final canUseFreeAnalysis = !isGuestUser || remainingQuota > 0;
     final freeAnalysisValue = isGuestUser ? remainingQuota.toString() : '∞';
     final freeAnalysisLabel = isGuestUser ? 'Sisa Gratis' : 'Akses AI';
+
+    // Fix #6: auto-redirect to limit gate when guest quota hits 0
+    if (isGuestUser && remainingQuota <= 0 && !_hasShownLimitGate && !isAuthLoading) {
+      _hasShownLimitGate = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.go('/limit-gate');
+        }
+      });
+    }
 
     return Scaffold(
       backgroundColor: AppColors.pageBackground,
@@ -111,12 +138,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: GestureDetector(
                 onTap: _isSigningOut
                     ? null
-                    : () async {
+                    : () {
                         if (isGuestUser) {
-                          context.go('/login');
+                          _cleanupGuestAndLeave();
                           return;
                         }
-                        await _signOut();
+                        _signOut();
                       },
                 child: _isSigningOut
                     ? const SizedBox(
@@ -249,6 +276,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         return;
                       }
 
+                      ref.invalidate(recentDocumentsProvider);
+
+                      final uploadTitle =
+                          Uri.encodeComponent(result.filename);
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        context.go(
+                            '/documents/${result.id}/analysis?title=$uploadTitle');
+                      });
                       if (isGuestUser) {
                         messenger.showSnackBar(
                           SnackBar(
@@ -297,6 +333,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         return;
                       }
 
+                      ref.invalidate(recentDocumentsProvider);
+
+                      final scanTitle =
+                          Uri.encodeComponent(result.filename);
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        context.go(
+                            '/documents/${result.id}/analysis?title=$scanTitle');
+                      });
                       if (isGuestUser) {
                         messenger.showSnackBar(
                           SnackBar(
@@ -320,6 +365,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     iconColor: AppColors.chatIcon,
                     bgColor: AppColors.chatBg,
                     title: 'Tanya AI\nLegalEasy',
+                    locked: isGuestUser,
                     onTap: () {
                       // Chat AI is only for registered users
                       if (isGuestUser) {
@@ -380,42 +426,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       );
                     },
                   ),
+                  // History card — locked for guests (upsell)
                   QuickActionCard(
                     icon: Icons.history,
                     iconColor: AppColors.historyIcon,
                     bgColor: AppColors.historyBg,
                     title: 'Riwayat\nDokumen',
+                    locked: isGuestUser,
                     onTap: () {
-                      // Document history is only for registered users
                       if (isGuestUser) {
                         if (!mounted) return;
-                        final router = GoRouter.of(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'Riwayat dokumen hanya tersedia untuk pengguna terdaftar. Silakan daftar untuk menyimpan riwayat.',
+                              'Riwayat dokumen hanya tersedia untuk pengguna terdaftar.',
                             ),
                             backgroundColor: AppColors.danger,
                           ),
                         );
-                        Future<void>.delayed(const Duration(milliseconds: 500),
-                            () {
+                        final router = GoRouter.of(context);
+                        Future<void>.delayed(const Duration(milliseconds: 500), () {
                           if (!mounted) return;
                           router.go('/register');
                         });
                         return;
                       }
-
                       context.go('/history');
                     },
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-
-              // Recent documents
-              const RecentDocumentsSection(),
-              const SizedBox(height: 24),
+              // Recent documents — registered users only.
+              // Guest users see analysis results only during the current session
+              // via the upload→analysis→chat flow; they have no persistent history.
+              if (!isGuestUser) ...[
+                const SizedBox(height: 24),
+                const RecentDocumentsSection(),
+                const SizedBox(height: 24),
+              ],
             ],
           ),
         ),

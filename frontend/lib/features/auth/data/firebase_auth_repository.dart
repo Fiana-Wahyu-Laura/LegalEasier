@@ -102,6 +102,79 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthUser> linkAnonymousToEmail(String email, String password) async {
+    final currentUser = _firebaseAuth.currentUser;
+    if (currentUser == null || !currentUser.isAnonymous) {
+      throw FirebaseAuthException(
+        code: 'link-failed',
+        message: 'Tidak ada sesi tamu untuk dikonversi.',
+      );
+    }
+
+    final credential = EmailAuthProvider.credential(
+      email: email,
+      password: password,
+    );
+
+    final result = await currentUser.linkWithCredential(credential);
+    final user = result.user;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'link-failed',
+        message: 'Gagal mengkonversi akun tamu.',
+      );
+    }
+
+    return AuthUser(
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+      isGuest: false,
+    );
+  }
+
+  @override
+  Future<AuthUser> linkAnonymousToGoogle() async {
+    final currentUser = _firebaseAuth.currentUser;
+    if (currentUser == null || !currentUser.isAnonymous) {
+      throw FirebaseAuthException(
+        code: 'link-failed',
+        message: 'Tidak ada sesi tamu untuk dikonversi.',
+      );
+    }
+
+    final googleUser = await _googleSignIn.signIn();
+    if (googleUser == null) {
+      throw FirebaseAuthException(
+        code: 'google-link-cancelled',
+        message: 'Login dengan Google dibatalkan.',
+      );
+    }
+
+    final googleAuth = await googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    final result = await currentUser.linkWithCredential(credential);
+    final user = result.user;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'google-link-failed',
+        message: 'Gagal mengkonversi akun tamu dengan Google.',
+      );
+    }
+
+    return AuthUser(
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+      isGuest: false,
+    );
+  }
+
+  @override
   Future<AuthUser> loginAnonymously() async {
     final credentials = await _firebaseAuth.signInAnonymously();
     final user = credentials.user;

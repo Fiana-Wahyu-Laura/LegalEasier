@@ -98,22 +98,22 @@ final dioProvider = Provider<Dio>((ref) {
 /// Retries up to [maxRetries] times with exponential backoff.
 /// Only retries on 5xx status codes and timeout exceptions.
 class _RetryInterceptor extends Interceptor {
+  static const _maxRetries = 2;
   final Dio dio;
-  final int maxRetries;
 
-  _RetryInterceptor({required this.dio, this.maxRetries = 2});
+  _RetryInterceptor({required this.dio});
 
   @override
   Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
     final isRetryable = _isRetryableError(err);
     final attempt = (err.requestOptions.extra['_retryAttempt'] as int?) ?? 0;
 
-    if (isRetryable && attempt < maxRetries) {
+    if (isRetryable && attempt < _maxRetries) {
       final nextAttempt = attempt + 1;
       final delay = Duration(milliseconds: 500 * nextAttempt); // exponential backoff
 
       if (kDebugMode) {
-        debugPrint('[Dio Retry] Attempt $nextAttempt/$maxRetries after ${delay.inMilliseconds}ms');
+        debugPrint('[Dio Retry] Attempt $nextAttempt/$_maxRetries after ${delay.inMilliseconds}ms');
       }
 
       await Future<void>.delayed(delay);
@@ -121,6 +121,21 @@ class _RetryInterceptor extends Interceptor {
       // Clone request with incremented retry counter
       final options = err.requestOptions;
       options.extra['_retryAttempt'] = nextAttempt;
+
+      // FormData cannot be reused/sent twice because its stream gets finalized.
+      // Recreate/clone FormData for retries.
+      if (options.data is FormData) {
+        final originalFormData = options.data as FormData;
+        final newFormData = FormData();
+        newFormData.fields.addAll(originalFormData.fields);
+        for (final file in originalFormData.files) {
+          newFormData.files.add(MapEntry(
+            file.key,
+            file.value.clone(),
+          ));
+        }
+        options.data = newFormData;
+      }
 
       try {
         final response = await dio.fetch(options);

@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:legaleasier/core/theme/app_theme.dart';
 import 'package:legaleasier/features/auth/presentation/providers/auth_provider.dart';
 import 'package:legaleasier/features/document/presentation/providers/document_provider.dart';
+import 'package:legaleasier/features/auth/presentation/trial_provider.dart';
 import 'package:legaleasier/features/document/presentation/providers/guest_quota_provider.dart';
 
 /// Bottom sheet untuk upload atau scan dokumen
@@ -36,9 +37,11 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final authUser = ref.watch(authNotifierProvider).value;
+    final authState = ref.watch(authNotifierProvider);
+    final authUser = authState.value;
     final remainingQuota = ref.watch(guestQuotaProvider).value ?? 5;
-    final isGuest = authUser?.isGuest ?? true;
+    // Only treat as guest when auth is resolved — avoid flicker during loading (#10)
+    final isGuest = authState.isLoading ? false : (authUser?.isGuest ?? false);
     final isLocked = isGuest && remainingQuota <= 0;
     final uploadState = ref.watch(documentUploadProvider);
     final isUploading = uploadState.isLoading;
@@ -310,14 +313,18 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
       final uploadedDocument =
           await ref.read(documentUploadProvider.notifier).uploadDocument(file);
 
-      final authUser = ref.read(authNotifierProvider).value;
-      if (authUser?.isGuest ?? true) {
+      // Sync quota from backend response (single source of truth).
+      // Backend includes remaining_quota in the upload response for guests.
+      if (uploadedDocument.remainingQuota != null) {
+        ref
+            .read(trialControllerProvider)
+            .syncFromUploadResponse(uploadedDocument.remainingQuota!);
+      } else {
+        // Fallback: optimistic local decrement
         try {
-          await ref
-              .read(guestQuotaProvider.notifier)
-              .consumeAnalysis(isGuest: true);
+          ref.read(trialControllerProvider).consumeIfGuest();
         } catch (_) {
-          // If quota persistence fails, continue without blocking upload completion.
+          // Non-blocking.
         }
       }
 

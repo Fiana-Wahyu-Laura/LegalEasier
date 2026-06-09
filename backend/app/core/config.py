@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     nlp_service_url: AnyHttpUrl = Field(default="http://localhost:8001", validation_alias="NLP_SERVICE_URL")
     storage_root: str = Field(default="storage", validation_alias="STORAGE_ROOT")
 
+    # MinIO / S3-compatible object storage
+    minio_endpoint: str = Field(default="170.30.0.1:9000", validation_alias="MINIO_ENDPOINT")
+    minio_access_key: str = Field(default="", validation_alias="MINIO_ACCESS_KEY")
+    minio_secret_key: str = Field(default="", validation_alias="MINIO_SECRET_KEY")
+    minio_bucket_name: str = Field(default="legaleasier-documents", validation_alias="MINIO_BUCKET_NAME")
+    minio_secure: bool = Field(default=False, validation_alias="MINIO_SECURE")
+    use_s3_storage: bool = Field(default=False, validation_alias="USE_S3_STORAGE")
+
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
         env_file_encoding="utf-8",

@@ -66,3 +66,16 @@ async def consume_guest_quota(db: AsyncSession, user_id: uuid.UUID) -> int:
     quota.last_reset = datetime.now(timezone.utc)
     await db.flush()
     return quota.remaining_quota
+
+
+async def refund_guest_quota(db: AsyncSession, user_id: uuid.UUID) -> int:
+    """Refund one guest AI attempt (e.g. when NLP processing fails).
+
+    Returns the updated remaining quota. Never exceeds the default allowance.
+    """
+    quota = await get_or_create_guest_quota(db, user_id, for_update=True)
+    if quota.remaining_quota < DEFAULT_GUEST_FREE_ANALYSES:
+        quota.remaining_quota += 1
+        quota.last_reset = datetime.now(timezone.utc)
+        await db.flush()
+    return quota.remaining_quota

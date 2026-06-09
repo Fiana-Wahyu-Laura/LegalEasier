@@ -7,6 +7,7 @@ from app.api.routes.documents import router as documents_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.analysis import router as analysis_router
 from app.api.routes.chat import router as chat_router
+from app.api.routes.guest import router as guest_router
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -35,6 +36,10 @@ OPENAPI_TAGS = [
     {
         "name": "chat",
         "description": "RAG chatbot — ask questions about analysed documents.",
+    },
+    {
+        "name": "guest",
+        "description": "Guest quota — check remaining free analyses.",
     },
 ]
 
@@ -86,6 +91,7 @@ app.include_router(documents_router, prefix=settings.api_v1_prefix)
 app.include_router(auth_router, prefix=settings.api_v1_prefix)
 app.include_router(analysis_router, prefix=settings.api_v1_prefix)
 app.include_router(chat_router, prefix=settings.api_v1_prefix)
+app.include_router(guest_router, prefix=settings.api_v1_prefix)
 
 
 @app.get("/", tags=["health"])

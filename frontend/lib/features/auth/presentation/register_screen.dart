@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -33,10 +34,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
 
     try {
-      await ref.read(authNotifierProvider.notifier).registerWithEmailPassword(
-            _emailController.text.trim(),
-            _passwordController.text.trim(),
-          );
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null && currentUser.isAnonymous) {
+        // Convert anonymous account to permanent, preserving data
+        await ref.read(authNotifierProvider.notifier).linkAnonymousToEmail(
+              _emailController.text.trim(),
+              _passwordController.text.trim(),
+            );
+      } else {
+        await ref.read(authNotifierProvider.notifier).registerWithEmailPassword(
+              _emailController.text.trim(),
+              _passwordController.text.trim(),
+            );
+      }
       if (!mounted) return;
       context.go('/home');
     } catch (error) {
@@ -55,6 +65,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   Future<void> _registerWithGoogle() async {
     try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null && currentUser.isAnonymous) {
+        // Sign out anonymous user first — Google Sign-In can conflict
+        // with an existing anonymous Firebase session. The user hasn't
+        // created any data yet (just arrived from onboarding).
+        await FirebaseAuth.instance.signOut();
+      }
       await ref.read(authNotifierProvider.notifier).loginWithGoogle();
       if (!mounted) return;
       context.go('/home');
@@ -74,7 +91,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   String _friendlyErrorMessage(Object error) {
     final message = error.toString().toLowerCase();
-    if (message.contains('email-already-in-use')) {
+    if (message.contains('email-already-in-use') || message.contains('requires-recent-login')) {
       return 'Email sudah terdaftar. Silakan masuk.';
     }
     if (message.contains('weak-password')) {
@@ -82,6 +99,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
     if (message.contains('network')) {
       return 'Koneksi internet bermasalah. Coba lagi.';
+    }
+    if (message.contains('credential-already-in-use')) {
+      return 'Akun ini sudah terhubung. Silakan masuk.';
     }
     return 'Gagal membuat akun. Silakan coba lagi.';
   }

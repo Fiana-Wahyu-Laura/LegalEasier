@@ -65,6 +65,30 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
     }
   }
 
+  /// Convert current anonymous account to email/password, preserving UID and data.
+  Future<void> linkAnonymousToEmail(String email, String password) async {
+    state = const AsyncValue.loading();
+    try {
+      final user = await _repository.linkAnonymousToEmail(email, password);
+      state = AsyncValue.data(user);
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Convert current anonymous account to Google, preserving UID and data.
+  Future<void> linkAnonymousToGoogle() async {
+    state = const AsyncValue.loading();
+    try {
+      final user = await _repository.linkAnonymousToGoogle();
+      state = AsyncValue.data(user);
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+      rethrow;
+    }
+  }
+
   Future<void> logout() async {
     state = const AsyncValue.loading();
     try {

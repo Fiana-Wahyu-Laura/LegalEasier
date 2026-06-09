@@ -61,6 +61,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _signInWithGoogle() async {
     try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null && currentUser.isAnonymous) {
+        // Sign out anonymous user first — linkWithCredential can fail
+        // due to a conflict between GoogleSignIn SDK and the existing
+        // anonymous Firebase session. The user hasn't created any data
+        // yet (just arrived from onboarding), so there's nothing to lose.
+        await FirebaseAuth.instance.signOut();
+      }
       await ref.read(authNotifierProvider.notifier).loginWithGoogle();
       if (!mounted) return;
       context.go('/home');
@@ -101,8 +109,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           debugPrint('[LoginScreen] ERROR: Could not get ID token after login: $e');
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text(
+            const SnackBar(
+              content: Text(
                 'Token tidak tersedia. Silakan coba lagi.',
                 style: TextStyle(color: Colors.white),
               ),
@@ -114,8 +122,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
+          const SnackBar(
+            content: Text(
               'Gagal masuk sebagai tamu. Silakan coba lagi.',
               style: TextStyle(color: Colors.white),
             ),
@@ -131,8 +139,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
       debugPrint('[LoginScreen] Anonymous login error: $error');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
+        const SnackBar(
+          content: Text(
             'Gagal masuk sebagai tamu. Silakan coba lagi.',
             style: TextStyle(color: Colors.white),
           ),

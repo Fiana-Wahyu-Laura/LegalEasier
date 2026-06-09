@@ -11,8 +11,8 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id: uuid.UUID = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: uuid.UUID | None = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    document_id: uuid.UUID | None = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False)
+    user_id: uuid.UUID | None = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    document_id: uuid.UUID | None = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     question: str | None = Column(Text, nullable=True)
     answer: str | None = Column(Text, nullable=True)
     sources_json: str | None = Column(Text, nullable=True)

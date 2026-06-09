@@ -50,4 +50,14 @@ class DocumentRepositoryImpl implements DocumentRepository {
   Future<AnalysisResult?> getDocumentAnalysis(String id) async {
     return documentService.fetchDocumentAnalysis(id);
   }
+
+  @override
+  Future<Map<String, dynamic>> getGuestQuota() async {
+    return documentService.fetchGuestQuota();
+  }
+
+  @override
+  Future<void> deleteGuestDocuments() async {
+    return documentService.deleteGuestDocuments();
+  }
 }
