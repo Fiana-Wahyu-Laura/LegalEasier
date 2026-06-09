@@ -414,43 +414,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       );
                     },
                   ),
-                  QuickActionCard(
-                    icon: Icons.history,
-                    iconColor: AppColors.historyIcon,
-                    bgColor: AppColors.historyBg,
-                    title: 'Riwayat\nDokumen',
-                    locked: isGuestUser,
-                    onTap: () {
-                      // Document history is only for registered users
-                      if (isGuestUser) {
-                        if (!mounted) return;
-                        final router = GoRouter.of(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Riwayat dokumen hanya tersedia untuk pengguna terdaftar. Silakan daftar untuk menyimpan riwayat.',
-                            ),
-                            backgroundColor: AppColors.danger,
-                          ),
-                        );
-                        Future<void>.delayed(const Duration(milliseconds: 500),
-                            () {
-                          if (!mounted) return;
-                          router.go('/register');
-                        });
-                        return;
-                      }
-
-                      context.go('/history');
-                    },
-                  ),
+                  // History card — registered users only
+                  if (!isGuestUser)
+                    QuickActionCard(
+                      icon: Icons.history,
+                      iconColor: AppColors.historyIcon,
+                      bgColor: AppColors.historyBg,
+                      title: 'Riwayat\nDokumen',
+                      onTap: () => context.go('/history'),
+                    ),
                 ],
               ),
-              const SizedBox(height: 24),
-
-              // Recent documents
-              const RecentDocumentsSection(),
-              const SizedBox(height: 24),
+              // Recent documents — registered users only.
+              // Guest users see analysis results only during the current session
+              // via the upload→analysis→chat flow; they have no persistent history.
+              if (!isGuestUser) ...[
+                const SizedBox(height: 24),
+                const RecentDocumentsSection(),
+                const SizedBox(height: 24),
+              ],
             ],
           ),
         ),
