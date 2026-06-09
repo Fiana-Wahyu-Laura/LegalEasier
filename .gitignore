@@ -65,3 +65,6 @@ chroma_db/
 *.md
 !README.md
 frontend/android/local.properties
+
+# ===== Claude Code =====
+.claude/
