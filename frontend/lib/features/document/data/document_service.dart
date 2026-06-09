@@ -226,6 +226,18 @@ class DocumentService {
     }
   }
 
+  /// DELETE /api/v1/guest/documents
+  /// Soft-delete all documents owned by the current guest user.
+  /// Called when a guest signs out so documents don't persist across sessions.
+  Future<void> deleteGuestDocuments() async {
+    try {
+      await dio.delete('$_apiPrefix/guest/documents');
+    } on DioException catch (e) {
+      // Non-critical — don't block sign-out on failure
+      throw _handleDioError(e);
+    }
+  }
+
   /// Handle Dio errors dengan pesan yang user-friendly
   Exception _handleDioError(DioException error) {
     switch (error.type) {

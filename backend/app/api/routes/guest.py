@@ -8,11 +8,15 @@ Per CLAUDE.md §8: All endpoints except /auth/* require Bearer JWT token.
 """
 
 import logging
+import uuid
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
+from app.models.document import Document
 from app.schemas.auth import AuthUser
 from app.schemas.common import StandardResponse
 from app.services.guest_quota import (
@@ -22,6 +26,7 @@ from app.services.guest_quota import (
     ensure_guest_quota_available,
     refund_guest_quota,
 )
+from app.services.nlp_client import NLPServiceClient, get_nlp_client
 
 logger = logging.getLogger(__name__)
 
@@ -62,4 +67,52 @@ async def get_guest_quota(
             "total": DEFAULT_GUEST_FREE_ANALYSES,
         },
         message=f"Guest quota: {quota.remaining_quota}/{DEFAULT_GUEST_FREE_ANALYSES} remaining.",
+    )
+
+
+@router.delete("/documents", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_guest_documents(
+    current_user: AuthUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    nlp_client: NLPServiceClient = Depends(get_nlp_client),
+) -> None:
+    """
+    Soft-delete all documents owned by the current guest user.
+
+    Called by the frontend when a guest signs out — documents exist only
+    for the duration of the session.  Registered users cannot call this
+    (their documents are persistent).
+    """
+    if not current_user.is_guest:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only guest users can clear session documents.",
+        )
+
+    from sqlalchemy import select as sa_select
+
+    # Find all non-deleted documents owned by this guest
+    stmt = sa_select(Document).where(
+        Document.owner_id == current_user.id,
+        Document.deleted_at.is_(None),
+    )
+    result = await db.execute(stmt)
+    docs = result.scalars().all()
+
+    now = datetime.now(timezone.utc)
+    deleted_count = 0
+    for doc in docs:
+        doc.deleted_at = now
+        doc.file_content = None  # Free up storage
+        deleted_count += 1
+
+        # Clean up NLP collection (best-effort)
+        try:
+            await nlp_client.delete_document_collection(doc.id)
+        except Exception:
+            pass
+
+    await db.commit()
+    logger.info(
+        "Cleaned up %d guest documents for user %s", deleted_count, current_user.id,
     )

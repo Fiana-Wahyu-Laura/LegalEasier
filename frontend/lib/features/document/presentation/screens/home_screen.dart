@@ -25,6 +25,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _isSigningOut = false;
   bool _hasShownLimitGate = false;
 
+  Future<void> _cleanupGuestAndLeave() async {
+    try {
+      await ref
+          .read(documentRepositoryProvider)
+          .deleteGuestDocuments();
+    } catch (_) {
+      // Non-blocking.
+    }
+    if (!mounted) return;
+    context.go('/login');
+  }
+
   Widget _buildAvatar(String userInitial) {
     return Container(
       width: 36,
@@ -126,12 +138,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: GestureDetector(
                 onTap: _isSigningOut
                     ? null
-                    : () async {
+                    : () {
                         if (isGuestUser) {
-                          context.go('/login');
+                          _cleanupGuestAndLeave();
                           return;
                         }
-                        await _signOut();
+                        _signOut();
                       },
                 child: _isSigningOut
                     ? const SizedBox(
@@ -414,15 +426,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       );
                     },
                   ),
-                  // History card — registered users only
-                  if (!isGuestUser)
-                    QuickActionCard(
-                      icon: Icons.history,
-                      iconColor: AppColors.historyIcon,
-                      bgColor: AppColors.historyBg,
-                      title: 'Riwayat\nDokumen',
-                      onTap: () => context.go('/history'),
-                    ),
+                  // History card — locked for guests (upsell)
+                  QuickActionCard(
+                    icon: Icons.history,
+                    iconColor: AppColors.historyIcon,
+                    bgColor: AppColors.historyBg,
+                    title: 'Riwayat\nDokumen',
+                    locked: isGuestUser,
+                    onTap: () {
+                      if (isGuestUser) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Riwayat dokumen hanya tersedia untuk pengguna terdaftar.',
+                            ),
+                            backgroundColor: AppColors.danger,
+                          ),
+                        );
+                        final router = GoRouter.of(context);
+                        Future<void>.delayed(const Duration(milliseconds: 500), () {
+                          if (!mounted) return;
+                          router.go('/register');
+                        });
+                        return;
+                      }
+                      context.go('/history');
+                    },
+                  ),
                 ],
               ),
               // Recent documents — registered users only.
