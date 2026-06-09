@@ -240,8 +240,15 @@ async def get_current_user(
             display_name=decoded_token.get("name"),
             device_id=x_device_id,  # Pass device_id for linking
         )
-        logger.info("get_current_user: User authenticated - id=%s, email=%s, device_id=%s, is_guest=%s", 
-                    user.id, user.email, user.device_id, user.is_active)
+
+        # Authoritative guest detection: the Firebase token tells us the
+        # sign-in provider. If "anonymous", the user is a guest regardless
+        # of email pattern or other heuristics.
+        firebase_claims = decoded_token.get("firebase", {})
+        is_guest = firebase_claims.get("sign_in_provider") == "anonymous"
+
+        logger.info("get_current_user: User authenticated - id=%s, email=%s, device_id=%s, is_guest=%s",
+                    user.id, user.email, user.device_id, is_guest)
         
         if not user.is_active:
             logger.warning("get_current_user: User account is inactive - id=%s", user.id)
@@ -249,8 +256,12 @@ async def get_current_user(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User account is inactive",
             )
-        
-        return AuthUser.model_validate(user)
+
+        # AuthUser.is_guest is determined from the Firebase token's
+        # sign_in_provider claim — the authoritative source.
+        auth_user = AuthUser.model_validate(user)
+        auth_user.is_guest = is_guest
+        return auth_user
     
     except HTTPException:
         raise

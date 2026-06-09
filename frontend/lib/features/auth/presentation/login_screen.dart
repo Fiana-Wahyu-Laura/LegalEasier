@@ -63,11 +63,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null && currentUser.isAnonymous) {
-        // Convert anonymous account to permanent Google account, preserving data
-        await ref.read(authNotifierProvider.notifier).linkAnonymousToGoogle();
-      } else {
-        await ref.read(authNotifierProvider.notifier).loginWithGoogle();
+        // Sign out anonymous user first — linkWithCredential can fail
+        // due to a conflict between GoogleSignIn SDK and the existing
+        // anonymous Firebase session. The user hasn't created any data
+        // yet (just arrived from onboarding), so there's nothing to lose.
+        await FirebaseAuth.instance.signOut();
       }
+      await ref.read(authNotifierProvider.notifier).loginWithGoogle();
       if (!mounted) return;
       context.go('/home');
     } catch (error) {

@@ -67,11 +67,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null && currentUser.isAnonymous) {
-        // Convert anonymous account to permanent Google account, preserving data
-        await ref.read(authNotifierProvider.notifier).linkAnonymousToGoogle();
-      } else {
-        await ref.read(authNotifierProvider.notifier).loginWithGoogle();
+        // Sign out anonymous user first — Google Sign-In can conflict
+        // with an existing anonymous Firebase session. The user hasn't
+        // created any data yet (just arrived from onboarding).
+        await FirebaseAuth.instance.signOut();
       }
+      await ref.read(authNotifierProvider.notifier).loginWithGoogle();
       if (!mounted) return;
       context.go('/home');
     } catch (error) {
