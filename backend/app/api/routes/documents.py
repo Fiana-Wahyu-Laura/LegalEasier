@@ -21,7 +21,7 @@ from app.models.document import Document
 from app.schemas.auth import AuthUser
 from app.schemas.common import StandardResponse
 from app.services.guest_quota import consume_guest_quota, ensure_guest_quota_available
-from app.services.storage import get_storage_service, StorageService
+from app.services.storage import get_storage_service, StorageService, S3StorageService
 from app.services.nlp_client import get_nlp_client, NLPServiceClient
 from app.schemas.document import DocumentListItem, DocumentResponse, DocumentStatusResponse, DocumentTextResponse
 from sqlalchemy import select
@@ -56,7 +56,7 @@ async def upload_document(
     file: UploadFile = File(...),
     current_user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    storage: StorageService = Depends(get_storage_service),
+    storage: StorageService | S3StorageService = Depends(get_storage_service),
     nlp_client: NLPServiceClient = Depends(get_nlp_client),
 ) -> StandardResponse:
     """
@@ -321,7 +321,7 @@ async def delete_document(
     document_id: uuid.UUID,
     current_user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    storage: StorageService = Depends(get_storage_service),
+    storage: StorageService | S3StorageService = Depends(get_storage_service),
     nlp_client: NLPServiceClient = Depends(get_nlp_client),
 ) -> None:
     """Soft-delete document and its NLP collection. Only owner can delete (CLAUDE.md §8)."""
@@ -372,12 +372,14 @@ async def download_document_file(
     document_id: uuid.UUID,
     current_user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    storage: StorageService | S3StorageService = Depends(get_storage_service),
 ) -> Response:
     """
     Download the original file for a document.
 
-    Reads file_content (BYTEA) from PostgreSQL and serves it with the
-    correct Content-Type header.  Only the document owner may download.
+    Serves file_content (BYTEA) for legacy documents, or fetches from
+    S3/MinIO for documents stored in object storage.  Only the document
+    owner may download.
     """
     stmt = select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
     result = await db.execute(stmt)
@@ -389,7 +391,19 @@ async def download_document_file(
     if document.owner_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    if not document.file_content:
+    # Try bytea first (legacy docs), then S3/MinIO
+    if document.file_content:
+        content = document.file_content
+    elif document.storage_path:
+        try:
+            content = storage.get_file(document.storage_path)
+        except Exception as exc:
+            logger.error("Failed to fetch %s from object storage: %s", document_id, exc)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve file from storage.",
+            ) from exc
+    else:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File content not available for this document.",
@@ -399,7 +413,7 @@ async def download_document_file(
     media_type = _EXT_TO_MIME.get(ext, "application/octet-stream")
 
     return Response(
-        content=document.file_content,
+        content=content,
         media_type=media_type,
         headers={
             "Content-Disposition": f'attachment; filename="{document.filename}"',
@@ -423,9 +437,10 @@ async def process_document_ocr(
     """
     Background task to process document via NLP pipeline.
 
-    Fetches file_content from PostgreSQL BYTEA, sends to NLP service,
-    and updates document status.  Retry policy: max 3 attempts with
-    exponential backoff (2s, 4s).  On final failure marks status=failed.
+    Fetches file content from PostgreSQL BYTEA (legacy) or S3/MinIO,
+    sends to NLP service, and updates document status.  Retry policy:
+    max 3 attempts with exponential backoff (2s, 4s).  On final failure
+    marks status=failed.
     """
     import asyncio
 
@@ -439,9 +454,9 @@ async def process_document_ocr(
                 result = await db.execute(stmt)
                 document = result.scalar_one_or_none()
 
-                if not document or not document.file_content:
+                if not document:
                     logger.error(
-                        "Document %s not found or has no file content", document_id,
+                        "Document %s not found", document_id,
                     )
                     return
 
@@ -450,7 +465,24 @@ async def process_document_ocr(
                     document.status = "processing"
                     await db.commit()
 
-                file_content = document.file_content
+                # Get file content — try bytea first, fall back to S3
+                if document.file_content:
+                    file_content = document.file_content
+                elif document.storage_path:
+                    storage_svc = get_storage_service()
+                    try:
+                        file_content = storage_svc.get_file(document.storage_path)
+                    except Exception as exc:
+                        logger.error(
+                            "Failed to fetch document %s from object storage: %s",
+                            document_id, exc,
+                        )
+                        return
+                else:
+                    logger.error(
+                        "Document %s has no file content or storage path", document_id,
+                    )
+                    return
 
             # Call NLP service
             logger.info(
