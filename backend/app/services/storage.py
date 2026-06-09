@@ -135,6 +135,7 @@ class S3StorageService:
             access_key=self.settings.minio_access_key,
             secret_key=self.settings.minio_secret_key,
             secure=self.settings.minio_secure,
+            region="us-east-1",
         )
         self.bucket = self.settings.minio_bucket_name
 
