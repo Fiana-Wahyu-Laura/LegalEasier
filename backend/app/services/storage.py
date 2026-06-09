@@ -161,23 +161,18 @@ class S3StorageService:
             - object_key: S3 key to store in storage_path column
             - None: no bytea content (file lives in MinIO)
         """
-        import io
         import mimetypes
 
         object_key = self._get_object_key(original_filename, document_id)
 
-        # Read file bytes first — avoids streaming signature issues with minio-py 7.x
-        with open(file_path, "rb") as f:
-            file_data = f.read()
-
         # Detect content type
         content_type, _ = mimetypes.guess_type(original_filename)
 
-        self.client.put_object(
+        # fput_object uploads directly from disk — no streaming, no signature issues
+        self.client.fput_object(
             self.bucket,
             object_key,
-            data=io.BytesIO(file_data),
-            length=len(file_data),
+            file_path,
             content_type=content_type or "application/octet-stream",
         )
         return object_key, None
