@@ -49,12 +49,12 @@ class LegalEasierApp extends StatelessWidget {
     if (!kDebugMode) {
       ErrorWidget.builder = (FlutterErrorDetails details) {
         const message = 'Terjadi kesalahan aplikasi.';
-        return MaterialApp(
+        return const MaterialApp(
           home: Scaffold(
             body: Center(
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: const Text(message, textAlign: TextAlign.center),
+                padding: EdgeInsets.all(16.0),
+                child: Text(message, textAlign: TextAlign.center),
               ),
             ),
           ),

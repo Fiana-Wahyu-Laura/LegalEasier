@@ -10,6 +10,7 @@ import os
 import tempfile
 import uuid
 import json
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends, status
 from fastapi.responses import Response
@@ -146,14 +147,14 @@ async def list_documents(
 
     # Count total documents for pagination metadata
     count_stmt = select(func.count()).select_from(Document).where(
-        Document.owner_id == current_user.id
+        Document.owner_id == current_user.id, Document.deleted_at.is_(None)
     )
     total_count = (await db.execute(count_stmt)).scalar() or 0
 
     stmt = (
         select(Document)
         .options(load_only(*_LIST_COLUMNS))
-        .where(Document.owner_id == current_user.id)
+        .where(Document.owner_id == current_user.id, Document.deleted_at.is_(None))
         .order_by(Document.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -182,7 +183,7 @@ async def get_document_count(
     from sqlalchemy import func
 
     stmt = select(func.count()).select_from(Document).where(
-        Document.owner_id == current_user.id
+        Document.owner_id == current_user.id, Document.deleted_at.is_(None)
     )
     result = await db.execute(stmt)
     count = result.scalar() or 0
@@ -207,7 +208,7 @@ async def search_documents(
     stmt = (
         select(Document)
         .options(load_only(*_LIST_COLUMNS))
-        .where(Document.owner_id == current_user.id)
+        .where(Document.owner_id == current_user.id, Document.deleted_at.is_(None))
         .where(Document.filename.ilike(f"%{q}%"))
         .order_by(Document.created_at.desc())
         .limit(limit)
@@ -229,7 +230,7 @@ async def get_document(
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     """Fetch document metadata. Only owner can access (CLAUDE.md §8)."""
-    stmt = select(Document).where(Document.id == document_id)
+    stmt = select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
     result = await db.execute(stmt)
     document = result.scalar_one_or_none()
 
@@ -254,7 +255,7 @@ async def get_document_status(
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     """Get document processing status. Only owner can access (CLAUDE.md §8)."""
-    stmt = select(Document).where(Document.id == document_id)
+    stmt = select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
     result = await db.execute(stmt)
     document = result.scalar_one_or_none()
 
@@ -281,7 +282,7 @@ async def get_document_text(
     Get extracted text from document. Only owner can access (CLAUDE.md §8).
     Returns 202 Accepted if still processing, 200 with text if done, 400 if failed.
     """
-    stmt = select(Document).where(Document.id == document_id)
+    stmt = select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
     result = await db.execute(stmt)
     document = result.scalar_one_or_none()
 
@@ -323,8 +324,11 @@ async def delete_document(
     storage: StorageService = Depends(get_storage_service),
     nlp_client: NLPServiceClient = Depends(get_nlp_client),
 ) -> None:
-    """Delete document and its NLP collection. Only owner can delete (CLAUDE.md §8)."""
-    stmt = select(Document).where(Document.id == document_id)
+    """Soft-delete document and its NLP collection. Only owner can delete (CLAUDE.md §8)."""
+    stmt = select(Document).where(
+        Document.id == document_id,
+        Document.deleted_at.is_(None),
+    )
     result = await db.execute(stmt)
     document = result.scalar_one_or_none()
 
@@ -334,11 +338,20 @@ async def delete_document(
     if document.owner_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    storage.delete_file(document.storage_path)
-    await nlp_client.delete_document_collection(document_id)
-
-    await db.delete(document)
+    # Mark as deleted and free storage
+    document.deleted_at = datetime.now(timezone.utc)
+    document.file_content = None  # Free up BYTEA storage
     await db.commit()
+
+    # Clean up external resources (best-effort)
+    try:
+        storage.delete_file(document.storage_path)
+    except Exception:
+        pass
+    try:
+        await nlp_client.delete_document_collection(document_id)
+    except Exception:
+        pass
 
 # ---------------------------------------------------------------------------
 # File download endpoint (CLAUDE.md §8 — GET /documents/{id}/file)
@@ -366,7 +379,7 @@ async def download_document_file(
     Reads file_content (BYTEA) from PostgreSQL and serves it with the
     correct Content-Type header.  Only the document owner may download.
     """
-    stmt = select(Document).where(Document.id == document_id)
+    stmt = select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
     result = await db.execute(stmt)
     document = result.scalar_one_or_none()
 
@@ -422,7 +435,7 @@ async def process_document_ocr(
         try:
             # Fetch document from database to get file_content
             async with AsyncSessionLocal() as db:
-                stmt = select(Document).where(Document.id == document_id)
+                stmt = select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
                 result = await db.execute(stmt)
                 document = result.scalar_one_or_none()
 
@@ -450,7 +463,7 @@ async def process_document_ocr(
 
             # Update document with result
             async with AsyncSessionLocal() as db:
-                stmt = select(Document).where(Document.id == document_id)
+                stmt = select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
                 result = await db.execute(stmt)
                 document = result.scalar_one_or_none()
 
@@ -495,7 +508,7 @@ async def process_document_ocr(
     )
     try:
         async with AsyncSessionLocal() as db:
-            stmt = select(Document).where(Document.id == document_id)
+            stmt = select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
             result = await db.execute(stmt)
             document = result.scalar_one_or_none()
             if document:

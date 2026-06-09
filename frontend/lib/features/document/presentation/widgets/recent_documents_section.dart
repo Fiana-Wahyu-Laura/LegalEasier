@@ -106,9 +106,10 @@ class RecentDocumentsSection extends ConsumerWidget {
   }
 
   Widget _buildDocumentItem(BuildContext context, Document document) {
-    final subtitle = document.hasAnalysis
+    final hasAnalysis = document.hasAnalysis;
+    final subtitle = hasAnalysis
         ? 'Analisis tersedia • ${document.riskLevel ?? 'Aman'}'
-        : 'Analisis belum selesai';
+        : null;
 
     return GestureDetector(
       onTap: () {
@@ -138,16 +139,39 @@ class RecentDocumentsSection extends ConsumerWidget {
                     style: AppTextStyles.bodyLarge.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    subtitle,
-                    style: AppTextStyles.meta.copyWith(
-                      color: document.hasAnalysis
-                          ? AppColors.text1
-                          : AppColors.text2,
+                  if (hasAnalysis)
+                    Text(
+                      subtitle!,
+                      style: AppTextStyles.meta.copyWith(
+                        color: AppColors.text1,
+                      ),
+                    )
+                  else
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.brand),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Sedang dianalisis...',
+                          style: AppTextStyles.meta.copyWith(
+                            color: AppColors.brand,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
                 ],
               ),
             ),

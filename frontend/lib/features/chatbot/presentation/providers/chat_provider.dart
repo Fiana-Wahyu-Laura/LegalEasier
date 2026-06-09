@@ -10,15 +10,8 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   return ChatRepositoryImpl(chatService: ChatService(dio: dio));
 });
 
-final chatNotifierProvider = StateNotifierProvider.autoDispose
-    .family<ChatNotifier, AsyncValue<ChatState>, String>(
-  (ref, documentId) {
-    return ChatNotifier(
-      repository: ref.watch(chatRepositoryProvider),
-      documentId: documentId,
-    );
-  },
-);
+final chatNotifierProvider = AsyncNotifierProvider.autoDispose
+    .family<ChatNotifier, ChatState, String>(ChatNotifier.new);
 
 class ChatState {
   final List<ChatMessage> messages;
@@ -57,31 +50,26 @@ class ChatState {
       suggestions: suggestions ?? this.suggestions,
       remainingQuota: remainingQuota ?? this.remainingQuota,
       isSending: isSending ?? this.isSending,
-      errorMessage: errorMessage, // null explicitly clears error unless passed
+      errorMessage: errorMessage, // null explitcitly clears error unless passed
     );
   }
 }
 
-class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
-  final ChatRepository repository;
-  final String documentId;
+class ChatNotifier extends AutoDisposeFamilyAsyncNotifier<ChatState, String> {
+  ChatRepository get _repository => ref.watch(chatRepositoryProvider);
 
-  ChatNotifier({required this.repository, required this.documentId})
-      : super(const AsyncValue.loading()) {
-    _loadHistory();
-  }
-
-  Future<void> _loadHistory() async {
+  @override
+  Future<ChatState> build(String arg) async {
     try {
-      final messages = await repository.fetchHistory(documentId);
-      state = AsyncValue.data(ChatState.initial().copyWith(messages: messages));
-    } catch (e, st) {
-      // Fallback to empty state on load failure
-      state = AsyncValue.data(ChatState.initial());
+      final messages = await _repository.fetchHistory(arg);
+      return ChatState.initial().copyWith(messages: messages);
+    } catch (e, _) {
+      return ChatState.initial();
     }
   }
 
   Future<void> sendMessage(String message) async {
+    final documentId = arg;
     final currentState = state.value ?? ChatState.initial();
     final userMessage = ChatMessage.user(message);
     final updatedMessages = [...currentState.messages, userMessage];
@@ -95,7 +83,8 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     );
 
     try {
-      final response = await repository.sendMessage(documentId, message, updatedMessages);
+      final response =
+          await _repository.sendMessage(documentId, message, updatedMessages);
       final botMessage = ChatMessage.assistant(response.answer);
       final nextState = currentState.copyWith(
         messages: [...updatedMessages, botMessage],
@@ -105,7 +94,6 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       );
       state = AsyncValue.data(nextState);
     } catch (error) {
-      // Preserve history, only update error message
       state = AsyncValue.data(currentState.copyWith(
         messages: updatedMessages,
         isSending: false,

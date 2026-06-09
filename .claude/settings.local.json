@@ -7,7 +7,9 @@
       "Bash(find:*)",
       "Bash(grep:*)",
       "Bash(python:*)",
-      "Bash(flutter analyze:*)"
+      "Bash(flutter analyze:*)",
+      "Bash(Get-ChildItem:*)",
+      "Bash(dart run:*)"
     ]
   }
 }

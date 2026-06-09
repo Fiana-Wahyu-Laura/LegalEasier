@@ -253,10 +253,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                       final uploadTitle =
                           Uri.encodeComponent(result.filename);
-                      context.go(
-                          '/documents/${result.id}/analysis?title=$uploadTitle');
-
-                      if (!mounted) return;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        context.go(
+                            '/documents/${result.id}/analysis?title=$uploadTitle');
+                      });
                       if (isGuestUser) {
                         messenger.showSnackBar(
                           SnackBar(
@@ -309,10 +310,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                       final scanTitle =
                           Uri.encodeComponent(result.filename);
-                      context.go(
-                          '/documents/${result.id}/analysis?title=$scanTitle');
-
-                      if (!mounted) return;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        context.go(
+                            '/documents/${result.id}/analysis?title=$scanTitle');
+                      });
                       if (isGuestUser) {
                         messenger.showSnackBar(
                           SnackBar(

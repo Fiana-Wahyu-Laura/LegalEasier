@@ -101,8 +101,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           debugPrint('[LoginScreen] ERROR: Could not get ID token after login: $e');
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text(
+            const SnackBar(
+              content: Text(
                 'Token tidak tersedia. Silakan coba lagi.',
                 style: TextStyle(color: Colors.white),
               ),
@@ -114,8 +114,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
+          const SnackBar(
+            content: Text(
               'Gagal masuk sebagai tamu. Silakan coba lagi.',
               style: TextStyle(color: Colors.white),
             ),
@@ -131,8 +131,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
       debugPrint('[LoginScreen] Anonymous login error: $error');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
+        const SnackBar(
+          content: Text(
             'Gagal masuk sebagai tamu. Silakan coba lagi.',
             style: TextStyle(color: Colors.white),
           ),

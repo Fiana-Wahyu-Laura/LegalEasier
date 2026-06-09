@@ -10,6 +10,7 @@ Token flow:
 """
 
 import logging
+import uuid
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, Header
@@ -21,7 +22,6 @@ from app.schemas.auth import AuthUser, AuthRegisterRequest, AuthLoginRequest, Au
 from app.schemas.common import StandardResponse
 from app.models.user import User
 from app.core.config import get_settings
-import uuid
 
 logger = logging.getLogger(__name__)
 

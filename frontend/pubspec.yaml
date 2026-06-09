@@ -35,8 +35,9 @@ dependencies:
   file_picker: ^8.0.0
   image_picker: ^1.1.2
 
-  # Storage
+  # Storage / ID generation
   shared_preferences: ^2.3.0
+  uuid: ^4.5.0
 
   # Icons
   cupertino_icons: ^1.0.8
