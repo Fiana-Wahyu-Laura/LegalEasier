@@ -47,7 +47,7 @@ firebase_app_id_file.json
 *.swp
 *.swo
 *~
-
+null
 # ===== OS =====
 .DS_Store
 Thumbs.db

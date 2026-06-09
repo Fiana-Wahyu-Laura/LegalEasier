@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,7 +10,7 @@ import 'package:legaleasier/features/analysis/presentation/widgets/analysis_summ
 import 'package:legaleasier/features/analysis/presentation/widgets/risk_clause_card.dart';
 import 'package:legaleasier/features/analysis/presentation/widgets/risk_overview_card.dart';
 
-class DocumentAnalysisScreen extends ConsumerWidget {
+class DocumentAnalysisScreen extends ConsumerStatefulWidget {
   final String documentId;
   final String documentTitle;
 
@@ -19,16 +21,59 @@ class DocumentAnalysisScreen extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final analysisAsyncValue = ref.watch(documentAnalysisProvider(documentId));
+  ConsumerState<DocumentAnalysisScreen> createState() =>
+      _DocumentAnalysisScreenState();
+}
+
+class _DocumentAnalysisScreenState
+    extends ConsumerState<DocumentAnalysisScreen> {
+  Timer? _pollTimer;
+  static const _pollInterval = Duration(seconds: 3);
+
+  @override
+  void dispose() {
+    _cancelPolling();
+    super.dispose();
+  }
+
+  void _cancelPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  void _startPolling() {
+    if (_pollTimer != null) return;
+    _pollTimer = Timer.periodic(_pollInterval, (_) {
+      ref.invalidate(documentAnalysisProvider(widget.documentId));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final analysisAsyncValue =
+        ref.watch(documentAnalysisProvider(widget.documentId));
+
+    // Manage polling: start when analysis is not yet available (null),
+    // stop when data arrives or an error occurs.
+    analysisAsyncValue.whenData((analysis) {
+      if (analysis == null) {
+        _startPolling();
+      } else {
+        _cancelPolling();
+      }
+    });
+    if (analysisAsyncValue.hasError) {
+      _cancelPolling();
+    }
 
     final chatFab = analysisAsyncValue.maybeWhen(
       data: (analysis) {
         if (analysis == null) return null;
         return FloatingActionButton.extended(
           onPressed: () {
-            final encodedTitle = Uri.encodeComponent(documentTitle);
-            context.go('/documents/$documentId/chat?title=$encodedTitle');
+            final encodedTitle = Uri.encodeComponent(widget.documentTitle);
+            context.go(
+                '/documents/${widget.documentId}/chat?title=$encodedTitle');
           },
           icon: const Icon(Icons.chat_bubble_outline),
           label: const Text('Tanya AI'),
@@ -39,13 +84,13 @@ class DocumentAnalysisScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(documentTitle),
+        title: Text(widget.documentTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Muat ulang',
             onPressed: () {
-              ref.invalidate(documentAnalysisProvider(documentId));
+              ref.invalidate(documentAnalysisProvider(widget.documentId));
             },
           ),
         ],
@@ -65,16 +110,7 @@ class DocumentAnalysisScreen extends ConsumerWidget {
         ),
         data: (analysis) {
           if (analysis == null) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24),
-                child: Text(
-                  'Analisis dokumen belum tersedia. Silakan periksa kembali setelah beberapa saat.',
-                  style: AppTextStyles.bodyLarge,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
+            return _buildProcessingPlaceholder();
           }
 
           final summary = analysis.summary?.trim();
@@ -86,7 +122,7 @@ class DocumentAnalysisScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  documentTitle,
+                  widget.documentTitle,
                   style: AppTextStyles.sectionTitle,
                 ),
                 const SizedBox(height: 8),
@@ -117,6 +153,26 @@ class DocumentAnalysisScreen extends ConsumerWidget {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildProcessingPlaceholder() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 20),
+          Text(
+            'Menganalisis dokumen...\nMohon tunggu beberapa saat.',
+            style: AppTextStyles.bodyLarge.copyWith(
+              color: AppColors.text2,
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

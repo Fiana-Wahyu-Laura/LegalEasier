@@ -10,15 +10,12 @@ from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.firebase import is_mock_mode, verify_firebase_token
+from app.core.firebase import verify_firebase_token
 from app.db.session import get_db_session
 from app.models.user import User
 from app.schemas.auth import AuthUser
 
 logger = logging.getLogger(__name__)
-
-# Fixed mock user ID for development (consistent across requests)
-_MOCK_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -147,10 +144,6 @@ async def get_current_user(
     - Token validation happens in deps.py get_current_user()
     - Firebase UID is stored in users table, used to link all data
     
-    In MOCK_MODE (no Firebase credentials):
-    - Any Bearer token is accepted
-    - Returns a fixed mock user without DB lookup
-    
     Args:
         authorization: Authorization header (expected format: "Bearer <token>")
         x_device_id: Optional device ID for linking anonymous sessions
@@ -186,19 +179,8 @@ async def get_current_user(
         # Verify Firebase token and extract claims
         decoded_token = await verify_firebase_token(token)
         logger.debug("get_current_user: Token verified successfully, uid=%s", decoded_token.get("uid"))
-        
-        # MOCK_MODE: return a mock user directly (no DB lookup needed)
-        if is_mock_mode():
-            logger.info("get_current_user: MOCK_MODE - returning mock user")
-            return AuthUser(
-                id=_MOCK_USER_ID,
-                email=decoded_token.get("email", "dev@legaleasier.local"),
-                display_name=decoded_token.get("name", "Development User"),
-                is_active=True,
-                is_guest=True,
-            )
-        
-        # Production: extract Firebase UID and ensure a matching local user exists.
+
+        # Extract Firebase UID and ensure a matching local user exists.
         firebase_uid = decoded_token.get("uid")
         if not firebase_uid:
             logger.error("get_current_user: Firebase token missing 'uid' claim")

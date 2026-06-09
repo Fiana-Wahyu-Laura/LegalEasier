@@ -249,6 +249,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         return;
                       }
 
+                      ref.invalidate(recentDocumentsProvider);
+
+                      final uploadTitle =
+                          Uri.encodeComponent(result.filename);
+                      context.go(
+                          '/documents/${result.id}/analysis?title=$uploadTitle');
+
+                      if (!mounted) return;
                       if (isGuestUser) {
                         messenger.showSnackBar(
                           SnackBar(
@@ -297,6 +305,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         return;
                       }
 
+                      ref.invalidate(recentDocumentsProvider);
+
+                      final scanTitle =
+                          Uri.encodeComponent(result.filename);
+                      context.go(
+                          '/documents/${result.id}/analysis?title=$scanTitle');
+
+                      if (!mounted) return;
                       if (isGuestUser) {
                         messenger.showSnackBar(
                           SnackBar(
