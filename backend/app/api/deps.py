@@ -8,6 +8,7 @@ from collections.abc import AsyncGenerator
 
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError as SAIntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.firebase import verify_firebase_token
@@ -85,7 +86,23 @@ async def _get_or_create_user_from_firebase_token(
             logger.info("Reusing existing guest session for device_id: %s (old_uid: %s, new_uid: %s)",
                        device_id, existing_guest.firebase_uid, firebase_uid)
             existing_guest.firebase_uid = firebase_uid
-            await db.commit()
+            try:
+                await db.commit()
+            except SAIntegrityError:
+                await db.rollback()
+                # Race condition: another concurrent request already assigned
+                # this firebase_uid. Re-fetch by firebase_uid.
+                logger.info("Race on device_id linking — re-fetching by firebase_uid: %s", firebase_uid)
+                stmt = select(User).where(User.firebase_uid == firebase_uid)
+                result = await db.execute(stmt)
+                existing_guest = result.scalar_one_or_none()
+                if existing_guest:
+                    # Update device_id on the concurrently-created row
+                    if device_id and not existing_guest.device_id:
+                        existing_guest.device_id = device_id
+                        await db.commit()
+                    return existing_guest
+                raise  # Should never happen
             await db.refresh(existing_guest)
             return existing_guest
 
@@ -114,21 +131,46 @@ async def _get_or_create_user_from_firebase_token(
                     user.id, firebase_uid, device_id)
         return user
 
-    # Create new user
-    user = User(
-        id=uuid.uuid4(),
-        firebase_uid=firebase_uid,
-        email=email,
-        display_name=display_name or "User",
-        device_id=device_id,  # Store device_id for future session linking
-        is_active=True,
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    logger.info("Auto-provisioned new user (id=%s) for Firebase UID: %s, email: %s, device_id: %s", 
-                user.id, firebase_uid, email, device_id)
-    return user
+    # Create new user — with race-condition guard for concurrent requests.
+    # Two requests for the same firebase_uid/device_id can arrive simultaneously
+    # (e.g. GET /guest/quota and GET /documents on first launch). One INSERT
+    # will succeed; the other must retry the SELECT instead of crashing.
+    try:
+        user = User(
+            id=uuid.uuid4(),
+            firebase_uid=firebase_uid,
+            email=email,
+            display_name=display_name or "User",
+            device_id=device_id,
+            is_active=True,
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        logger.info("Auto-provisioned new user (id=%s) for Firebase UID: %s, email: %s, device_id: %s",
+                    user.id, firebase_uid, email, device_id)
+        return user
+    except SAIntegrityError:
+        await db.rollback()
+        logger.info(
+            "Race condition: user already exists for firebase_uid=%s / device_id=%s. "
+            "Retrying lookup.",
+            firebase_uid, device_id,
+        )
+        # Re-run the lookup — the concurrent request created the user
+        stmt = select(User).where(
+            or_(User.firebase_uid == firebase_uid, User.email == email)
+        )
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        if user:
+            # Update device_id if provided
+            if device_id and not user.device_id:
+                user.device_id = device_id
+                await db.commit()
+                await db.refresh(user)
+            return user
+        raise  # Re-raise if still not found (should not happen)
 
 
 async def get_current_user(
