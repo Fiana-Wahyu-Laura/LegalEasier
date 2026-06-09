@@ -128,6 +128,7 @@ class S3StorageService:
 
     def __init__(self):
         from minio import Minio
+        import logging
 
         self.settings = get_settings()
         self.client = Minio(
@@ -135,9 +136,15 @@ class S3StorageService:
             access_key=self.settings.minio_access_key,
             secret_key=self.settings.minio_secret_key,
             secure=self.settings.minio_secure,
-            region="us-east-1",
         )
         self.bucket = self.settings.minio_bucket_name
+
+        # Ensure bucket exists
+        try:
+            if not self.client.bucket_exists(self.bucket):
+                self.client.make_bucket(self.bucket)
+        except Exception as exc:
+            logging.getLogger(__name__).warning("Failed to check/create bucket %s: %s", self.bucket, exc)
 
     def _get_object_key(self, original_filename: str, document_id: uuid.UUID) -> str:
         """

@@ -122,6 +122,21 @@ class _RetryInterceptor extends Interceptor {
       final options = err.requestOptions;
       options.extra['_retryAttempt'] = nextAttempt;
 
+      // FormData cannot be reused/sent twice because its stream gets finalized.
+      // Recreate/clone FormData for retries.
+      if (options.data is FormData) {
+        final originalFormData = options.data as FormData;
+        final newFormData = FormData();
+        newFormData.fields.addAll(originalFormData.fields);
+        for (final file in originalFormData.files) {
+          newFormData.files.add(MapEntry(
+            file.key,
+            file.value.clone(),
+          ));
+        }
+        options.data = newFormData;
+      }
+
       try {
         final response = await dio.fetch(options);
         return handler.resolve(response);
