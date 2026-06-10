@@ -1,144 +1,181 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 import 'package:legaleasier/core/theme/app_theme.dart';
+import 'package:legaleasier/features/auth/presentation/providers/auth_provider.dart';
 
-class OnboardingScreen extends StatefulWidget {
+class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
   @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
+  ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
-  final PageController _pageController = PageController();
-  int _currentPage = 0;
+class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
+  bool _isStarting = false;
 
-  static const List<Map<String, Object>> _pages = [
-    {
-      'title': 'Pahami dokumen hukum dengan mudah',
-      'subtitle': 'Upload kontrak atau perjanjian, lalu biarkan AI membantu menjelaskan setiap klausul.',
-      'icon': Icons.description_outlined,
-      'accent': AppColors.brand2,
-      'chips': ['Upload PDF dan foto', 'Ringkasan yang lebih jelas'],
-    },
-    {
-      'title': 'Ringkas dan interpretasi jelas',
-      'subtitle': 'Dapatkan penjelasan bahasa sederhana untuk klausul yang rumit.',
-      'icon': Icons.lightbulb_outline,
-      'accent': AppColors.accent,
-      'chips': ['Risiko klausul penting', 'Bahasa yang mudah dipahami'],
-    },
-    {
-      'title': 'Akses kapan saja',
-      'subtitle': 'Simpan riwayat dokumen dan kembali ke analisis kapan pun diperlukan.',
-      'icon': Icons.history,
-      'accent': AppColors.brand,
-      'chips': ['Riwayat tersimpan', 'Tanya AI kapan pun'],
-    },
-  ];
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  void _nextPage() {
-    if (_currentPage < _pages.length - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+  Future<void> _startAsGuest() async {
+    setState(() => _isStarting = true);
+    try {
+      await ref.read(authNotifierProvider.notifier).loginAnonymously();
+      if (!mounted) return;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        context.go('/home');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal masuk. Periksa koneksi dan coba lagi.'),
+          backgroundColor: AppColors.danger,
+        ),
       );
-      return;
+    } finally {
+      if (mounted) setState(() => _isStarting = false);
     }
-
-    context.go('/login');
   }
 
-  Widget _buildHeroCard(Map<String, Object> page) {
-    final accent = page['accent'] as Color;
-    final chips = page['chips'] as List<String>;
-
+  Widget _buildFeatureItem({
+    required IconData icon,
+    required String text,
+  }) {
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(24),
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: Colors.black.withValues(alpha: 0.06),
-          width: 0.5,
+          color: Colors.white.withValues(alpha: 0.18),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 16, color: AppColors.white),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: Colors.white.withValues(alpha: 0.92),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogo() {
+    return Container(
+      width: 104,
+      height: 104,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.24),
+          width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: Colors.black.withValues(alpha: 0.14),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Container(
-            width: 92,
-            height: 92,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              page['icon'] as IconData,
-              size: 46,
-              color: accent,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            page['title'] as String,
-            textAlign: TextAlign.center,
-            style: AppTextStyles.loginTitle.copyWith(
-              color: AppColors.brand,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            page['subtitle'] as String,
-            textAlign: TextAlign.center,
-            style: AppTextStyles.bodyLarge.copyWith(
-              color: AppColors.text2,
-              height: 1.55,
+          Positioned(
+            left: 23,
+            top: 24,
+            child: Transform.rotate(
+              angle: -0.08,
+              child: Container(
+                width: 42,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Container(height: 2.5, width: 18, color: AppColors.brand),
+                    const SizedBox(height: 4),
+                    Container(height: 2.5, width: 14, color: AppColors.brand2),
+                    const SizedBox(height: 4),
+                    Container(height: 2.5, width: 16, color: AppColors.brand),
+                  ],
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            alignment: WrapAlignment.center,
-            children: [
-              for (final chip in chips)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: accent.withValues(alpha: 0.18),
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    chip,
-                    style: AppTextStyles.chipText.copyWith(
-                      color: accent,
-                    ),
+          Positioned(
+            left: 41,
+            top: 18,
+            child: Transform.rotate(
+              angle: 0.08,
+              child: Container(
+                width: 42,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.35),
+                    width: 1,
                   ),
                 ),
-            ],
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Container(height: 2.5, width: 18, color: AppColors.brand2),
+                    const SizedBox(height: 4),
+                    Container(height: 2.5, width: 14, color: AppColors.brand2),
+                    const SizedBox(height: 4),
+                    Container(height: 2.5, width: 16, color: AppColors.brand2),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 10,
+            bottom: 10,
+            child: Container(
+              width: 26,
+              height: 26,
+              decoration: const BoxDecoration(
+                color: AppColors.accent,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                'AI',
+                style: TextStyle(
+                  fontFamily: 'DM Sans',
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.brand,
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -148,79 +185,127 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.pageBg,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => context.go('/login'),
-                  child: Text(
-                    'Lewati',
-                    style: AppTextStyles.navLabel.copyWith(
-                      color: AppColors.text3,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.brand, AppColors.brand2],
+          ),
+        ),
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 32),
+                        _buildLogo(),
+                        const SizedBox(height: 28),
+                        Text(
+                          'LegalEasier',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.splashHeadline.copyWith(
+                            fontSize: 30,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Upload, scan, dan tanya. LegalEasier menjelaskan kontrak dalam bahasa yang kamu mengerti.',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.bodyLarge.copyWith(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            height: 1.55,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        _buildFeatureItem(
+                          icon: Icons.description_outlined,
+                          text: 'Upload dokumen PDF, foto, atau hasil scan.',
+                        ),
+                        const SizedBox(height: 10),
+                        _buildFeatureItem(
+                          icon: Icons.psychology_alt_outlined,
+                          text: 'Dapatkan ringkasan dan penjelasan yang lebih sederhana.',
+                        ),
+                        const SizedBox(height: 10),
+                        _buildFeatureItem(
+                          icon: Icons.history_outlined,
+                          text: 'Simpan riwayat analisis untuk dibuka kembali.',
+                        ),
+                        const SizedBox(height: 32),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isStarting ? null : _startAsGuest,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.accent,
+                              foregroundColor: AppColors.brand,
+                              minimumSize: const Size.fromHeight(50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              textStyle: AppTextStyles.btnSmall.copyWith(
+                                color: AppColors.brand,
+                              ),
+                            ),
+                            child: _isStarting
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.brand,
+                                    ),
+                                  )
+                                : const Text('Mulai Gratis — 5 Analisis'),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () => context.go('/login'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.white,
+                              side: BorderSide(
+                                color: Colors.white.withValues(alpha: 0.45),
+                                width: 1.2,
+                              ),
+                              minimumSize: const Size.fromHeight(46),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              textStyle: AppTextStyles.btnSmall.copyWith(
+                                color: AppColors.white,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                            child: const Text('Sudah punya akun? Masuk'),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Hanya alat bantu informatif, bukan pengganti konsultasi hukum profesional.',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.meta.copyWith(
+                            color: Colors.white.withValues(alpha: 0.75),
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: PageView.builder(
-                  controller: _pageController,
-                  itemCount: _pages.length,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _currentPage = index;
-                    });
-                  },
-                  itemBuilder: (context, index) {
-                    final page = _pages[index];
-                    return Center(
-                      child: _buildHeroCard(page),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 20),
-              SmoothPageIndicator(
-                controller: _pageController,
-                count: _pages.length,
-                effect: WormEffect(
-                  activeDotColor: AppColors.brand,
-                  dotColor: Colors.black.withValues(alpha: 0.12),
-                  dotHeight: 10,
-                  dotWidth: 10,
-                  spacing: 8,
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _nextPage,
-                  child: Text(
-                    _currentPage < _pages.length - 1
-                        ? 'Selanjutnya'
-                        : 'Mulai Sekarang',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => context.go('/login'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.brand2,
-                    side: const BorderSide(color: Color(0xFFE0E0E0)),
-                  ),
-                  child: const Text('Sudah punya akun? Masuk'),
-                ),
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),

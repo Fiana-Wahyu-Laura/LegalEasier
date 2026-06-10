@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Global Dio provider untuk HTTP requests
 final dioProvider = Provider<Dio>((ref) {
@@ -24,15 +25,52 @@ final dioProvider = Provider<Dio>((ref) {
     ),
   );
 
-  // Firebase auth interceptor — attach ID token to every request
+  // Firebase auth interceptor — attach ID token and device ID to every request
   dio.interceptors.add(
     InterceptorsWrapper(
       onRequest: (options, handler) async {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
-          final idToken = await user.getIdToken();
-          options.headers['Authorization'] = 'Bearer $idToken';
+          try {
+            // Get fresh ID token for API authentication
+            final idToken = await user.getIdToken();
+            if (idToken == null || idToken.isEmpty) {
+              if (kDebugMode) {
+                debugPrint('[Auth] WARNING: ID token is empty for user: ${user.uid}');
+              }
+            } else {
+              options.headers['Authorization'] = 'Bearer $idToken';
+              if (kDebugMode) {
+                debugPrint('[Auth] ID token attached (${idToken.length} chars), user: ${user.uid}');
+              }
+            }
+          } catch (e) {
+            if (kDebugMode) {
+              debugPrint('[Auth] ERROR getting ID token: $e');
+            }
+          }
+        } else {
+          if (kDebugMode) {
+            debugPrint('[Auth] WARNING: No current user in interceptor');
+          }
         }
+
+        // Attach device ID for anonymous session linking
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final deviceId = prefs.getString('app_device_id');
+          if (deviceId != null) {
+            options.headers['X-Device-ID'] = deviceId;
+            if (kDebugMode) {
+              debugPrint('[Auth] Device ID attached: $deviceId');
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('[Auth] WARNING: Could not attach device ID: $e');
+          }
+        }
+
         return handler.next(options);
       },
     ),
@@ -60,22 +98,22 @@ final dioProvider = Provider<Dio>((ref) {
 /// Retries up to [maxRetries] times with exponential backoff.
 /// Only retries on 5xx status codes and timeout exceptions.
 class _RetryInterceptor extends Interceptor {
+  static const _maxRetries = 2;
   final Dio dio;
-  final int maxRetries;
 
-  _RetryInterceptor({required this.dio, this.maxRetries = 2});
+  _RetryInterceptor({required this.dio});
 
   @override
   Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
     final isRetryable = _isRetryableError(err);
     final attempt = (err.requestOptions.extra['_retryAttempt'] as int?) ?? 0;
 
-    if (isRetryable && attempt < maxRetries) {
+    if (isRetryable && attempt < _maxRetries) {
       final nextAttempt = attempt + 1;
       final delay = Duration(milliseconds: 500 * nextAttempt); // exponential backoff
 
       if (kDebugMode) {
-        debugPrint('[Dio Retry] Attempt $nextAttempt/$maxRetries after ${delay.inMilliseconds}ms');
+        debugPrint('[Dio Retry] Attempt $nextAttempt/$_maxRetries after ${delay.inMilliseconds}ms');
       }
 
       await Future<void>.delayed(delay);
@@ -83,6 +121,21 @@ class _RetryInterceptor extends Interceptor {
       // Clone request with incremented retry counter
       final options = err.requestOptions;
       options.extra['_retryAttempt'] = nextAttempt;
+
+      // FormData cannot be reused/sent twice because its stream gets finalized.
+      // Recreate/clone FormData for retries.
+      if (options.data is FormData) {
+        final originalFormData = options.data as FormData;
+        final newFormData = FormData();
+        newFormData.fields.addAll(originalFormData.fields);
+        for (final file in originalFormData.files) {
+          newFormData.files.add(MapEntry(
+            file.key,
+            file.value.clone(),
+          ));
+        }
+        options.data = newFormData;
+      }
 
       try {
         final response = await dio.fetch(options);

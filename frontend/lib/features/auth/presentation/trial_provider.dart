@@ -6,27 +6,40 @@ import 'package:legaleasier/features/auth/presentation/providers/auth_provider.d
 final hasReachedLimitProvider = Provider<bool>((ref) {
   final authUser = ref.watch(authNotifierProvider).value;
   final remaining = ref.watch(guestQuotaProvider).value ?? 5;
-  return authUser == null && remaining <= 0;
+  return (authUser?.isGuest ?? false) && remaining <= 0;
 });
 
+/// TrialController is the single entry point for guest quota operations.
+///
+/// All upload/scan flows should use this controller rather than calling
+/// GuestQuotaNotifier directly. This ensures consistent behaviour and
+/// makes it easy to add side effects (analytics, etc.) later.
 class TrialController {
   final Ref ref;
   TrialController(this.ref);
 
+  /// Update local quota from the upload response provided by the backend.
+  /// The backend is the single source of truth — this just syncs the cache.
+  void syncFromUploadResponse(int remainingQuota) {
+    ref.read(guestQuotaProvider.notifier).updateFromUploadResponse(remainingQuota);
+  }
+
+  /// Optimistic local decrement after a successful upload.
+  /// The backend has already consumed the slot; this keeps the UI in sync.
   Future<void> consumeIfGuest() async {
     final authUser = ref.read(authNotifierProvider).value;
-    if (authUser == null) {
-      try {
-        await ref.read(guestQuotaProvider.notifier).consumeAnalysis(isGuest: true);
-      } catch (_) {
-        // ignore errors from persistence
-      }
+    if (authUser?.isGuest ?? false) {
+      await ref
+          .read(guestQuotaProvider.notifier)
+          .consumeAnalysis(isGuest: true);
     }
   }
 
-  Future<void> resetQuota() async {
-    await ref.read(guestQuotaProvider.notifier).resetQuota();
+  /// Force-refresh quota from the backend.
+  Future<void> refreshQuota() async {
+    await ref.read(guestQuotaProvider.notifier).refreshQuota();
   }
 }
 
-final trialControllerProvider = Provider<TrialController>((ref) => TrialController(ref));
+final trialControllerProvider =
+    Provider<TrialController>((ref) => TrialController(ref));

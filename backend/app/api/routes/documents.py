@@ -10,6 +10,7 @@ import os
 import tempfile
 import uuid
 import json
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends, status
 from fastapi.responses import Response
@@ -19,7 +20,8 @@ from app.api.deps import get_current_user, get_db
 from app.models.document import Document
 from app.schemas.auth import AuthUser
 from app.schemas.common import StandardResponse
-from app.services.storage import get_storage_service, StorageService
+from app.services.guest_quota import consume_guest_quota, ensure_guest_quota_available, refund_guest_quota
+from app.services.storage import get_storage_service, StorageService, S3StorageService
 from app.services.nlp_client import get_nlp_client, NLPServiceClient
 from app.schemas.document import DocumentListItem, DocumentResponse, DocumentStatusResponse, DocumentTextResponse
 from sqlalchemy import select
@@ -54,7 +56,7 @@ async def upload_document(
     file: UploadFile = File(...),
     current_user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    storage: StorageService = Depends(get_storage_service),
+    storage: StorageService | S3StorageService = Depends(get_storage_service),
     nlp_client: NLPServiceClient = Depends(get_nlp_client),
 ) -> StandardResponse:
     """
@@ -79,6 +81,9 @@ async def upload_document(
             detail=f"File too large. Max size: {MAX_FILE_SIZE / 1024 / 1024} MB",
         )
 
+    if current_user.is_guest:
+        await ensure_guest_quota_available(db, current_user.id)
+
     # Create document record
     doc_id = uuid.uuid4()
     try:
@@ -100,16 +105,29 @@ async def upload_document(
             owner_id=current_user.id,
         )
         db.add(document)
+
+        # For guest users: check and consume one quota slot at upload time.
+        # If NLP fails later, the background task will refund the slot.
+        remaining_quota: int | None = None
+        if current_user.is_guest:
+            remaining_quota = await consume_guest_quota(db, current_user.id)
+
         await db.commit()
         await db.refresh(document)
 
-        # Schedule OCR processing (background task)
-        background_tasks.add_task(process_document_ocr, doc_id, file.filename, nlp_client)
+        # Schedule OCR processing (background task) — pass owner_id for potential refund
+        background_tasks.add_task(
+            process_document_ocr, doc_id, file.filename, nlp_client, current_user.id, current_user.is_guest,
+        )
 
         doc_response = DocumentResponse.model_validate(document)
+        response_data = doc_response.model_dump(mode="json")
+        if remaining_quota is not None:
+            response_data["remaining_quota"] = remaining_quota
+
         return StandardResponse(
             success=True,
-            data=doc_response.model_dump(mode="json"),
+            data=response_data,
             message="Document uploaded successfully.",
         )
 
@@ -140,14 +158,14 @@ async def list_documents(
 
     # Count total documents for pagination metadata
     count_stmt = select(func.count()).select_from(Document).where(
-        Document.owner_id == current_user.id
+        Document.owner_id == current_user.id, Document.deleted_at.is_(None)
     )
     total_count = (await db.execute(count_stmt)).scalar() or 0
 
     stmt = (
         select(Document)
         .options(load_only(*_LIST_COLUMNS))
-        .where(Document.owner_id == current_user.id)
+        .where(Document.owner_id == current_user.id, Document.deleted_at.is_(None))
         .order_by(Document.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -176,7 +194,7 @@ async def get_document_count(
     from sqlalchemy import func
 
     stmt = select(func.count()).select_from(Document).where(
-        Document.owner_id == current_user.id
+        Document.owner_id == current_user.id, Document.deleted_at.is_(None)
     )
     result = await db.execute(stmt)
     count = result.scalar() or 0
@@ -201,7 +219,7 @@ async def search_documents(
     stmt = (
         select(Document)
         .options(load_only(*_LIST_COLUMNS))
-        .where(Document.owner_id == current_user.id)
+        .where(Document.owner_id == current_user.id, Document.deleted_at.is_(None))
         .where(Document.filename.ilike(f"%{q}%"))
         .order_by(Document.created_at.desc())
         .limit(limit)
@@ -223,7 +241,7 @@ async def get_document(
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     """Fetch document metadata. Only owner can access (CLAUDE.md §8)."""
-    stmt = select(Document).where(Document.id == document_id)
+    stmt = select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
     result = await db.execute(stmt)
     document = result.scalar_one_or_none()
 
@@ -248,7 +266,7 @@ async def get_document_status(
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     """Get document processing status. Only owner can access (CLAUDE.md §8)."""
-    stmt = select(Document).where(Document.id == document_id)
+    stmt = select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
     result = await db.execute(stmt)
     document = result.scalar_one_or_none()
 
@@ -275,7 +293,7 @@ async def get_document_text(
     Get extracted text from document. Only owner can access (CLAUDE.md §8).
     Returns 202 Accepted if still processing, 200 with text if done, 400 if failed.
     """
-    stmt = select(Document).where(Document.id == document_id)
+    stmt = select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
     result = await db.execute(stmt)
     document = result.scalar_one_or_none()
 
@@ -314,11 +332,14 @@ async def delete_document(
     document_id: uuid.UUID,
     current_user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    storage: StorageService = Depends(get_storage_service),
+    storage: StorageService | S3StorageService = Depends(get_storage_service),
     nlp_client: NLPServiceClient = Depends(get_nlp_client),
 ) -> None:
-    """Delete document and its NLP collection. Only owner can delete (CLAUDE.md §8)."""
-    stmt = select(Document).where(Document.id == document_id)
+    """Soft-delete document and its NLP collection. Only owner can delete (CLAUDE.md §8)."""
+    stmt = select(Document).where(
+        Document.id == document_id,
+        Document.deleted_at.is_(None),
+    )
     result = await db.execute(stmt)
     document = result.scalar_one_or_none()
 
@@ -328,11 +349,20 @@ async def delete_document(
     if document.owner_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    storage.delete_file(document.storage_path)
-    await nlp_client.delete_document_collection(document_id)
-
-    await db.delete(document)
+    # Mark as deleted and free storage
+    document.deleted_at = datetime.now(timezone.utc)
+    document.file_content = None  # Free up BYTEA storage
     await db.commit()
+
+    # Clean up external resources (best-effort)
+    try:
+        storage.delete_file(document.storage_path)
+    except Exception:
+        pass
+    try:
+        await nlp_client.delete_document_collection(document_id)
+    except Exception:
+        pass
 
 # ---------------------------------------------------------------------------
 # File download endpoint (CLAUDE.md §8 — GET /documents/{id}/file)
@@ -353,14 +383,16 @@ async def download_document_file(
     document_id: uuid.UUID,
     current_user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    storage: StorageService | S3StorageService = Depends(get_storage_service),
 ) -> Response:
     """
     Download the original file for a document.
 
-    Reads file_content (BYTEA) from PostgreSQL and serves it with the
-    correct Content-Type header.  Only the document owner may download.
+    Serves file_content (BYTEA) for legacy documents, or fetches from
+    S3/MinIO for documents stored in object storage.  Only the document
+    owner may download.
     """
-    stmt = select(Document).where(Document.id == document_id)
+    stmt = select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
     result = await db.execute(stmt)
     document = result.scalar_one_or_none()
 
@@ -370,7 +402,19 @@ async def download_document_file(
     if document.owner_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    if not document.file_content:
+    # Try bytea first (legacy docs), then S3/MinIO
+    if document.file_content:
+        content = document.file_content
+    elif document.storage_path:
+        try:
+            content = storage.get_file(document.storage_path)
+        except Exception as exc:
+            logger.error("Failed to fetch %s from object storage: %s", document_id, exc)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve file from storage.",
+            ) from exc
+    else:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File content not available for this document.",
@@ -380,7 +424,7 @@ async def download_document_file(
     media_type = _EXT_TO_MIME.get(ext, "application/octet-stream")
 
     return Response(
-        content=document.file_content,
+        content=content,
         media_type=media_type,
         headers={
             "Content-Disposition": f'attachment; filename="{document.filename}"',
@@ -400,13 +444,16 @@ async def process_document_ocr(
     document_id: uuid.UUID,
     filename: str,
     nlp_client: NLPServiceClient,
+    owner_id: uuid.UUID | None = None,
+    is_guest: bool = False,
 ) -> None:
     """
     Background task to process document via NLP pipeline.
 
-    Fetches file_content from PostgreSQL BYTEA, sends to NLP service,
-    and updates document status.  Retry policy: max 3 attempts with
-    exponential backoff (2s, 4s).  On final failure marks status=failed.
+    Fetches file content from PostgreSQL BYTEA (legacy) or S3/MinIO,
+    sends to NLP service, and updates document status.  Retry policy:
+    max 3 attempts with exponential backoff (2s, 4s).  On final failure
+    marks status=failed and refunds guest quota if applicable.
     """
     import asyncio
 
@@ -416,13 +463,13 @@ async def process_document_ocr(
         try:
             # Fetch document from database to get file_content
             async with AsyncSessionLocal() as db:
-                stmt = select(Document).where(Document.id == document_id)
+                stmt = select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
                 result = await db.execute(stmt)
                 document = result.scalar_one_or_none()
 
-                if not document or not document.file_content:
+                if not document:
                     logger.error(
-                        "Document %s not found or has no file content", document_id,
+                        "Document %s not found", document_id,
                     )
                     return
 
@@ -431,7 +478,24 @@ async def process_document_ocr(
                     document.status = "processing"
                     await db.commit()
 
-                file_content = document.file_content
+                # Get file content — try bytea first, fall back to S3
+                if document.file_content:
+                    file_content = document.file_content
+                elif document.storage_path:
+                    storage_svc = get_storage_service()
+                    try:
+                        file_content = storage_svc.get_file(document.storage_path)
+                    except Exception as exc:
+                        logger.error(
+                            "Failed to fetch document %s from object storage: %s",
+                            document_id, exc,
+                        )
+                        return
+                else:
+                    logger.error(
+                        "Document %s has no file content or storage path", document_id,
+                    )
+                    return
 
             # Call NLP service
             logger.info(
@@ -444,7 +508,7 @@ async def process_document_ocr(
 
             # Update document with result
             async with AsyncSessionLocal() as db:
-                stmt = select(Document).where(Document.id == document_id)
+                stmt = select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
                 result = await db.execute(stmt)
                 document = result.scalar_one_or_none()
 
@@ -482,18 +546,32 @@ async def process_document_ocr(
             logger.info("Retrying NLP for document %s in %ds...", document_id, delay)
             await asyncio.sleep(delay)
 
-    # All retries exhausted — mark as failed
+    # All retries exhausted — mark as failed and refund guest quota
     logger.error(
         "All %d NLP attempts failed for document %s. Marking as failed.",
         MAX_NLP_RETRIES, document_id,
     )
     try:
         async with AsyncSessionLocal() as db:
-            stmt = select(Document).where(Document.id == document_id)
+            stmt = select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
             result = await db.execute(stmt)
             document = result.scalar_one_or_none()
             if document:
                 document.status = "failed"
                 await db.commit()
+
+            # Refund guest quota — the user didn't get a usable analysis
+            if is_guest and owner_id:
+                try:
+                    refunded = await refund_guest_quota(db, owner_id)
+                    logger.info(
+                        "Refunded guest quota for user %s after NLP failure (doc %s). Remaining: %d",
+                        owner_id, document_id, refunded,
+                    )
+                except Exception as refund_exc:
+                    logger.error(
+                        "Failed to refund guest quota for user %s (doc %s): %s",
+                        owner_id, document_id, refund_exc,
+                    )
     except Exception as exc:
         logger.error("Failed to mark document %s as failed: %s", document_id, exc)

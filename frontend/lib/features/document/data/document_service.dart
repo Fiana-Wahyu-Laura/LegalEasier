@@ -26,8 +26,9 @@ class DocumentService {
         if (data['success'] == true && data['data'] != null) {
           final payload = data['data'];
           // Handle paginated response { items: [...] } or flat array
-          final List<dynamic> documentsList =
-              payload is Map ? (payload['items'] as List<dynamic>? ?? []) : payload as List<dynamic>;
+          final List<dynamic> documentsList = payload is Map
+              ? (payload['items'] as List<dynamic>? ?? [])
+              : payload as List<dynamic>;
           return documentsList
               .map((doc) => Document.fromJson(doc as Map<String, dynamic>))
               .toList();
@@ -55,8 +56,9 @@ class DocumentService {
         if (data['success'] == true && data['data'] != null) {
           final payload = data['data'];
           // Handle paginated response { items: [...] } or flat array
-          final List<dynamic> documentsList =
-              payload is Map ? (payload['items'] as List<dynamic>? ?? []) : payload as List<dynamic>;
+          final List<dynamic> documentsList = payload is Map
+              ? (payload['items'] as List<dynamic>? ?? [])
+              : payload as List<dynamic>;
           return documentsList
               .map((doc) => Document.fromJson(doc as Map<String, dynamic>))
               .toList();
@@ -205,6 +207,37 @@ class DocumentService {
     }
   }
 
+  /// GET /api/v1/guest/quota
+  /// Fetch server-authoritative guest quota (single source of truth).
+  /// Returns a map with keys: is_guest, remaining, total.
+  Future<Map<String, dynamic>> fetchGuestQuota() async {
+    try {
+      final response = await dio.get('$_apiPrefix/guest/quota');
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        if (data['success'] == true && data['data'] != null) {
+          return data['data'] as Map<String, dynamic>;
+        }
+      }
+      throw Exception('Failed to fetch guest quota: ${response.statusCode}');
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
+  /// DELETE /api/v1/guest/documents
+  /// Soft-delete all documents owned by the current guest user.
+  /// Called when a guest signs out so documents don't persist across sessions.
+  Future<void> deleteGuestDocuments() async {
+    try {
+      await dio.delete('$_apiPrefix/guest/documents');
+    } on DioException catch (e) {
+      // Non-critical — don't block sign-out on failure
+      throw _handleDioError(e);
+    }
+  }
+
   /// Handle Dio errors dengan pesan yang user-friendly
   Exception _handleDioError(DioException error) {
     switch (error.type) {
@@ -222,7 +255,14 @@ class DocumentService {
         );
       case DioExceptionType.badResponse:
         final statusCode = error.response?.statusCode;
-        final message = error.response?.data['message'] as String?;
+        final responseData = error.response?.data;
+        final detail = responseData is Map ? responseData['detail'] : null;
+        final apiMessage = responseData is Map ? responseData['message'] : null;
+        final message = detail is String
+            ? detail
+            : apiMessage is String
+                ? apiMessage
+                : null;
         return Exception(
             'Error: ${message ?? 'Request gagal (Code: $statusCode)'}');
       case DioExceptionType.cancel:

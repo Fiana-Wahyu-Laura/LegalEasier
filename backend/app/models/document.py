@@ -11,7 +11,7 @@ class Document(Base):
     __tablename__ = "documents"
 
     id: uuid.UUID = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    owner_id: uuid.UUID | None = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    owner_id: uuid.UUID | None = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     filename: str = Column(String(1024), nullable=False)
     storage_path: str = Column(String(2048), nullable=False)
     file_content: bytes | None = Column(LargeBinary(), nullable=True)
@@ -20,6 +20,7 @@ class Document(Base):
     summary: str | None = Column(Text, nullable=True)
     risk_score: int | None = Column(Integer, nullable=True)
     risk_clauses_json: str | None = Column(Text, nullable=True)
+    deleted_at: datetime | None = Column(DateTime(timezone=True), nullable=True)
     created_at: datetime = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -35,4 +36,5 @@ class Document(Base):
     __table_args__ = (
         Index("ix_documents_owner_id", "owner_id"),
         Index("ix_documents_status", "status"),
+        Index("ix_documents_deleted_at", "deleted_at"),
     )

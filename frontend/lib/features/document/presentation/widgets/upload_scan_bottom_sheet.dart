@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:legaleasier/core/theme/app_theme.dart';
 import 'package:legaleasier/features/auth/presentation/providers/auth_provider.dart';
 import 'package:legaleasier/features/document/presentation/providers/document_provider.dart';
+import 'package:legaleasier/features/auth/presentation/trial_provider.dart';
 import 'package:legaleasier/features/document/presentation/providers/guest_quota_provider.dart';
 
 /// Bottom sheet untuk upload atau scan dokumen
@@ -36,9 +37,11 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final authUser = ref.watch(authNotifierProvider).value;
+    final authState = ref.watch(authNotifierProvider);
+    final authUser = authState.value;
     final remainingQuota = ref.watch(guestQuotaProvider).value ?? 5;
-    final isGuest = authUser == null;
+    // Only treat as guest when auth is resolved — avoid flicker during loading (#10)
+    final isGuest = authState.isLoading ? false : (authUser?.isGuest ?? false);
     final isLocked = isGuest && remainingQuota <= 0;
     final uploadState = ref.watch(documentUploadProvider);
     final isUploading = uploadState.isLoading;
@@ -169,7 +172,8 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
             // Action buttons
             if (isLocked)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Text(
                   'Kuota gratis habis. Silakan masuk untuk melanjutkan analisis.',
                   style: AppTextStyles.bodySmall.copyWith(
@@ -203,7 +207,8 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: isUploading || isLocked ? null : _handlePrimaryAction,
+                      onPressed:
+                          isUploading || isLocked ? null : _handlePrimaryAction,
                       child: isUploading
                           ? const SizedBox(
                               height: 18,
@@ -308,23 +313,37 @@ class _UploadScanBottomSheetState extends ConsumerState<UploadScanBottomSheet> {
       final uploadedDocument =
           await ref.read(documentUploadProvider.notifier).uploadDocument(file);
 
-      final authUser = ref.read(authNotifierProvider).value;
-      if (authUser == null) {
+      // Sync quota from backend response (single source of truth).
+      // Backend includes remaining_quota in the upload response for guests.
+      if (uploadedDocument.remainingQuota != null) {
+        ref
+            .read(trialControllerProvider)
+            .syncFromUploadResponse(uploadedDocument.remainingQuota!);
+      } else {
+        // Fallback: optimistic local decrement
         try {
-          await ref.read(guestQuotaProvider.notifier).consumeAnalysis(isGuest: true);
+          ref.read(trialControllerProvider).consumeIfGuest();
         } catch (_) {
-          // If quota persistence fails, continue without blocking upload completion.
+          // Non-blocking.
         }
       }
 
       if (!mounted) return;
       Navigator.of(context).pop(uploadedDocument);
-    } on Exception {
+    } on Exception catch (error) {
       if (!mounted) return;
       messenger.showSnackBar(
-        const SnackBar(content: Text('Upload gagal. Silakan coba lagi.')),
+        SnackBar(content: Text(_formatUploadError(error))),
       );
     }
+  }
+
+  String _formatUploadError(Exception error) {
+    final message = error.toString().replaceFirst('Exception: ', '').trim();
+    if (message.isEmpty) {
+      return 'Upload gagal. Silakan coba lagi.';
+    }
+    return message;
   }
 
   /// Scan preview dengan corner brackets dan scan line

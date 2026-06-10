@@ -31,4 +31,12 @@ abstract class DocumentRepository {
 
   /// Fetch analysis result for a document
   Future<AnalysisResult?> getDocumentAnalysis(String id);
+
+  /// Fetch server-authoritative guest quota information.
+  /// Returns a map with keys: is_guest, remaining, total.
+  Future<Map<String, dynamic>> getGuestQuota();
+
+  /// Soft-delete all documents for the current guest user.
+  /// Called on guest sign-out so documents don't persist across sessions.
+  Future<void> deleteGuestDocuments();
 }

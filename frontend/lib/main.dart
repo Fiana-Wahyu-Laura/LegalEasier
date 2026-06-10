@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -11,6 +14,11 @@ import 'firebase_options.dart'; // ← tambahkan ini
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Generate device ID early for guest session persistence (#11).
+  // The Dio interceptor reads this from SharedPreferences to send
+  // as X-Device-ID header, enabling backend to restore guest sessions.
+  await _ensureDeviceId();
 
   // Global Flutter error handler
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -22,20 +30,33 @@ Future<void> main() async {
     // In production, send to analytics/monitoring here
   };
 
+  // Modern async error handler instead of runZonedGuarded
+  PlatformDispatcher.instance.onError = (error, stack) {
+    if (kDebugMode) {
+      debugPrint('Uncaught async error: $error');
+      debugPrintStack(stackTrace: stack);
+    }
+    return true;
+  };
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Run app inside a guarded zone to catch uncaught async errors
-  runZonedGuarded(() {
-    runApp(const ProviderScope(child: LegalEasierApp()));
-  }, (error, stack) {
-    // Log uncaught errors from the zone. Replace with crash reporting if available.
-    if (kDebugMode) {
-      debugPrint('Uncaught zone error: $error');
-      debugPrintStack(stackTrace: stack);
-    }
-  });
+  runApp(const ProviderScope(child: LegalEasierApp()));
+}
+
+/// Generate and persist a device ID on first launch.
+///
+/// Used for guest session persistence: the backend can link anonymous
+/// sessions from the same device. Must run before Firebase init so the
+/// Dio interceptor can pick it up on the first API call.
+Future<void> _ensureDeviceId() async {
+  const key = 'app_device_id';
+  final prefs = await SharedPreferences.getInstance();
+  if (!prefs.containsKey(key)) {
+    await prefs.setString(key, const Uuid().v4());
+  }
 }
 
 class LegalEasierApp extends StatelessWidget {
@@ -47,12 +68,12 @@ class LegalEasierApp extends StatelessWidget {
     if (!kDebugMode) {
       ErrorWidget.builder = (FlutterErrorDetails details) {
         const message = 'Terjadi kesalahan aplikasi.';
-        return MaterialApp(
+        return const MaterialApp(
           home: Scaffold(
             body: Center(
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: const Text(message, textAlign: TextAlign.center),
+                padding: EdgeInsets.all(16.0),
+                child: Text(message, textAlign: TextAlign.center),
               ),
             ),
           ),

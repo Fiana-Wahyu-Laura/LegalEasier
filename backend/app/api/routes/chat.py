@@ -75,9 +75,17 @@ async def send_chat_message(
     Backend responsibilities (Sprint 4):
     - enforce auth
     - enforce document ownership
-    - enforce guest quota (only for guest users)
+    - Chat AI is ONLY for registered (non-guest) users
     - proxy request to NLP /nlp/chat
     """
+    # Chat AI is only for registered users — completely block guests
+    if current_user.is_guest:
+        logger.warning("Guest user %s attempted to access chat endpoint (not allowed)", current_user.id)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chat AI feature is only available for registered users. Please register to use this feature.",
+        )
+
     stmt = select(Document).where(Document.id == document_id)
     result = await db.execute(stmt)
     document = result.scalar_one_or_none()
@@ -87,14 +95,6 @@ async def send_chat_message(
 
     if document.owner_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-
-    # Guest quota enforcement — only applies to guest (mock mode) users
-    remaining_quota: int | None = None
-    guest_quota: GuestQuota | None = None
-    if current_user.is_guest:
-        guest_quota = await _get_or_create_guest_quota(db, current_user.id)
-        if guest_quota.remaining_quota <= 0:
-            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Guest quota exhausted")
 
     chat_result = await nlp_client.chat_document(
         document_id=document_id,
@@ -119,11 +119,6 @@ async def send_chat_message(
         disclaimer=chat_result.disclaimer,
         remaining_quota=None,
     )
-
-    # Consume guest quota after successful NLP response
-    if guest_quota is not None:
-        remaining_quota = await _consume_guest_quota(db, guest_quota)
-        response_data.remaining_quota = remaining_quota
 
     # Persist chat message to DB
     try:
@@ -162,7 +157,16 @@ async def get_chat_history(
 ) -> StandardResponse:
     """
     Return persisted chat history for one document.
+    Only available for registered users.
     """
+    # Chat history is only for registered users — completely block guests
+    if current_user.is_guest:
+        logger.warning("Guest user %s attempted to access chat history endpoint (not allowed)", current_user.id)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chat history is only available for registered users.",
+        )
+
     stmt = select(Document).where(Document.id == document_id)
     result = await db.execute(stmt)
     document = result.scalar_one_or_none()

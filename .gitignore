@@ -33,6 +33,7 @@ frontend/legaleasier.iml
 
 # ===== Firebase credentials — NEVER commit =====
 **/google-services.json
+**/google-services.json.bck
 **/GoogleService-Info.plist
 **/firebase-credentials.json
 **/firebase_options.dart
@@ -46,7 +47,7 @@ firebase_app_id_file.json
 *.swp
 *.swo
 *~
-
+null
 # ===== OS =====
 .DS_Store
 Thumbs.db
@@ -63,5 +64,7 @@ chroma_db/
 # ===== Project-specific =====
 *.md
 !README.md
-!CLAUDE.md
 frontend/android/local.properties
+
+# ===== Claude Code =====
+.claude/

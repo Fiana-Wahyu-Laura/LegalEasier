@@ -8,16 +8,11 @@ import 'package:legaleasier/features/document/presentation/screens/home_screen.d
 import 'package:legaleasier/features/auth/presentation/login_screen.dart';
 import 'package:legaleasier/features/auth/presentation/register_screen.dart';
 import 'package:legaleasier/features/onboarding/presentation/onboarding_screen.dart';
-import 'package:legaleasier/features/onboarding/presentation/splash_screen.dart';
 
 class AppRouter {
   static final router = GoRouter(
-    initialLocation: '/splash',
+    initialLocation: '/onboarding',
     routes: [
-      GoRoute(
-        path: '/splash',
-        builder: (context, state) => const SplashScreen(),
-      ),
       GoRoute(
         path: '/onboarding',
         builder: (context, state) => const OnboardingScreen(),

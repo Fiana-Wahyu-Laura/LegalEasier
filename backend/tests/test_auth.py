@@ -136,7 +136,6 @@ def test_get_current_user_auto_provisions_missing_user(monkeypatch):
             "name": "New User",
         }
 
-    monkeypatch.setattr("app.api.deps.is_mock_mode", lambda: False)
     monkeypatch.setattr("app.api.deps.verify_firebase_token", fake_verify_firebase_token)
 
     db = FakeDB()

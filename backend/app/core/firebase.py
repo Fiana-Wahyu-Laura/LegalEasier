@@ -1,11 +1,8 @@
 """
 Firebase Admin SDK initialization and utilities.
 
-Supports two modes:
-- PRODUCTION: Full Firebase token verification using service account credentials.
-- MOCK_MODE: When FIREBASE_CREDENTIALS_PATH is not set or file not found,
-  token verification is skipped and a mock user UID is returned.
-  This allows development/testing without Firebase credentials.
+Requires a valid Firebase service account credentials file.
+Set FIREBASE_CREDENTIALS_PATH in .env to the path of your credentials JSON file.
 """
 
 import logging
@@ -17,15 +14,12 @@ logger = logging.getLogger(__name__)
 
 _firebase_app = None
 
-# Sentinel value for mock mode (no credentials available)
-MOCK_MODE = "MOCK_MODE"
-
 
 def initialize_firebase():
     """Initialize Firebase Admin SDK from credentials file.
 
-    If credentials are not found, sets mock mode flag instead of crashing.
-    This allows local development without a Firebase service account.
+    Raises:
+        RuntimeError: If credentials file path is not set or file not found.
     """
     global _firebase_app
 
@@ -36,15 +30,11 @@ def initialize_firebase():
     creds_path = settings.firebase_credentials_path
 
     if not creds_path or not Path(creds_path).exists():
-        logger.warning(
-            "Firebase credentials file not found at %s. "
-            "Firebase Auth will be MOCKED for development/testing. "
-            "For production, set FIREBASE_CREDENTIALS_PATH to valid credentials file.",
-            creds_path,
+        raise RuntimeError(
+            f"Firebase credentials file not found at '{creds_path}'. "
+            "Set FIREBASE_CREDENTIALS_PATH in .env to the path of a valid "
+            "Firebase service account JSON file."
         )
-        # Set mock mode flag
-        _firebase_app = MOCK_MODE
-        return
 
     # Lazy import — only needed when credentials exist
     import firebase_admin
@@ -63,19 +53,15 @@ def get_firebase_app():
     """Get Firebase app instance (initialize if needed).
 
     Returns:
-        - Firebase app if credentials are configured
-        - "MOCK_MODE" string if running in development mode without credentials
-        - None should never happen (initialize always sets a value)
+        Firebase app instance.
+
+    Raises:
+        RuntimeError: If Firebase cannot be initialized.
     """
     global _firebase_app
     if _firebase_app is None:
         initialize_firebase()
     return _firebase_app
-
-
-def is_mock_mode() -> bool:
-    """Check if Firebase is running in mock mode (no credentials)."""
-    return get_firebase_app() == MOCK_MODE
 
 
 async def verify_firebase_token(token: str) -> dict:
@@ -87,23 +73,13 @@ async def verify_firebase_token(token: str) -> dict:
 
     Returns:
         Decoded token claims including uid, email, etc.
-        In MOCK_MODE: returns a mock claims dict with uid derived from token.
 
     Raises:
-        InvalidIdTokenError: Token is invalid or malformed (production only)
-        ExpiredIdTokenError: Token has expired (production only)
+        InvalidIdTokenError: Token is invalid or malformed
+        ExpiredIdTokenError: Token has expired
         Exception: Other Firebase errors
     """
     app = get_firebase_app()
-
-    # Mock mode — skip real verification, return mock claims
-    if app == MOCK_MODE:
-        logger.debug("MOCK_MODE: skipping Firebase token verification")
-        return {
-            "uid": f"mock-uid-{token[:8]}",
-            "email": "dev@legaleasier.local",
-            "name": "Development User",
-        }
 
     # Production mode — real Firebase verification
     from firebase_admin import auth
@@ -114,12 +90,16 @@ async def verify_firebase_token(token: str) -> dict:
     )
 
     try:
+        logger.debug("verify_firebase_token: Attempting real Firebase verification (token length=%d)", len(token))
         decoded_token = auth.verify_id_token(token, app=app)
+        logger.debug("verify_firebase_token: Token verified successfully - uid=%s", decoded_token.get("uid"))
         return decoded_token
 
     except (InvalidIdTokenError, ExpiredIdTokenError, ExpiredSessionCookieError) as e:
-        logger.error("Firebase token verification failed: %s", e)
+        logger.error("verify_firebase_token: Firebase token verification failed - error=%s (%s)",
+                     str(e), type(e).__name__)
         raise
     except Exception as e:
-        logger.error("Unexpected error during Firebase token verification: %s", e)
+        logger.error("verify_firebase_token: Unexpected error during Firebase token verification - error=%s (%s)",
+                     str(e), type(e).__name__)
         raise

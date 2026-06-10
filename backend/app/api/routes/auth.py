@@ -10,6 +10,7 @@ Token flow:
 """
 
 import logging
+import uuid
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, Header
@@ -21,8 +22,6 @@ from app.schemas.auth import AuthUser, AuthRegisterRequest, AuthLoginRequest, Au
 from app.schemas.common import StandardResponse
 from app.models.user import User
 from app.core.config import get_settings
-from app.core.firebase import get_firebase_app, is_mock_mode, MOCK_MODE
-import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -153,21 +152,13 @@ async def register(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Email already registered",
             )
-        
-        app = get_firebase_app()
-        
-        if app == MOCK_MODE:
-            # Development mode: generate mock data
-            firebase_uid = f"mock-{uuid.uuid4().hex[:24]}"
-            id_token = f"mock-id-token-{firebase_uid}"
-            logger.info("MOCK_MODE: Creating user with UID %s", firebase_uid)
-        else:
-            # Production: create user via Firebase REST API (returns ID token directly)
-            firebase_response = await _firebase_sign_up_with_password(
-                request.email, request.password,
-            )
-            firebase_uid = firebase_response["localId"]
-            id_token = firebase_response["idToken"]
+
+        # Create user via Firebase REST API (returns ID token directly)
+        firebase_response = await _firebase_sign_up_with_password(
+            request.email, request.password,
+        )
+        firebase_uid = firebase_response["localId"]
+        id_token = firebase_response["idToken"]
         
         # Create user in local database
         new_user = User(
@@ -224,40 +215,23 @@ async def login(
         403: User account is inactive
     """
     try:
-        app = get_firebase_app()
-        
-        if app == MOCK_MODE:
-            # Development mode: skip password verification
-            stmt = select(User).where(User.email == request.email)
-            result = await db.execute(stmt)
-            user = result.scalar_one_or_none()
-            
-            if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid email or password",
-                )
-            
-            id_token = f"mock-id-token-{user.firebase_uid}"
-            logger.info("MOCK_MODE: Login for %s", request.email)
-        else:
-            # Production: verify email/password via Firebase REST API
-            # This returns a real Firebase ID token that verify_id_token() can validate
-            firebase_response = await _firebase_sign_in_with_password(
-                request.email, request.password,
+        # Verify email/password via Firebase REST API
+        # This returns a real Firebase ID token that verify_id_token() can validate
+        firebase_response = await _firebase_sign_in_with_password(
+            request.email, request.password,
+        )
+        id_token = firebase_response["idToken"]
+
+        # Look up user in local DB
+        stmt = select(User).where(User.email == request.email)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
             )
-            id_token = firebase_response["idToken"]
-            
-            # Look up user in local DB
-            stmt = select(User).where(User.email == request.email)
-            result = await db.execute(stmt)
-            user = result.scalar_one_or_none()
-            
-            if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid email or password",
-                )
         
         if not user.is_active:
             raise HTTPException(

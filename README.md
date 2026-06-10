@@ -7,24 +7,30 @@ upload dokumen -> OCR -> preprocessing -> analisis AI -> ringkasan + deteksi kla
 
 > Hasil analisis bersifat informatif dan edukatif, bukan pengganti nasihat hukum profesional.
 
-## Status Proyek (per 23 Mei 2026)
+## Status Proyek (per 10 Juni 2026)
 
-| Sprint | Fokus | Status |
-| --- | --- | --- |
-| Sprint 1 | Fondasi backend, auth, OCR dasar, schema DB | Selesai |
-| Sprint 2 | Upload dokumen, preprocessing, embedding, RAG storage | Selesai |
-| Sprint 3 | Analisis risiko berbasis LLM + risk score | Selesai |
-| Sprint 4 | Chatbot RAG end-to-end di app | Belum selesai |
-| Sprint 5 | History, polishing UI/UX | Belum selesai |
-| Sprint 6 | Hardening, deployment, optimization | Belum selesai |
+| Sprint   | Fokus                                                    | Status  |
+| -------- | -------------------------------------------------------- | ------- |
+| Sprint 1 | Fondasi backend, auth, OCR dasar, schema DB              | Selesai |
+| Sprint 2 | Upload dokumen, preprocessing, embedding, RAG storage    | Selesai |
+| Sprint 3 | Analisis risiko berbasis LLM + risk score                | Selesai |
+| Sprint 4 | Chatbot RAG end-to-end di app                            | Selesai |
+| Sprint 5 | History, limit gate guest mode, polishing UI/UX          | Selesai |
+| Sprint 6 | Hardening, CI/CD, onboarding unification                 | Selesai |
 
 ## Update Terbaru
 
-- Backend menyimpan file asli dokumen di PostgreSQL (`documents.file_content` / `bytea`) dan menyediakan download via endpoint file.
-- Alur auth backend sudah berbasis Firebase token verification dengan auto-provision user lokal.
-- Pemrosesan dokumen berjalan sebagai background task dengan retry ke NLP service.
-- NLP pipeline sudah sampai analisis risiko + summary (Claude sebagai primary, NVIDIA NIM sebagai fallback).
-- Endpoint analisis backend (`/documents/{id}/analysis`) sudah mengembalikan `summary`, `risk_score`, dan `risk_clauses`.
+- **Guest mode** — pengguna bisa mencoba 5 analisis gratis tanpa daftar. Kuota dilacak server-side di `guest_quotas` table sebagai single source of truth.
+- **Limit gate** — setelah kuota tamu habis, user diarahkan ke layar upsell dengan opsi daftar, Google sign-in, atau masuk.
+- **Onboarding unified** — halaman splash dan onboarding digabung jadi satu halaman tunggal dengan tombol "Mulai Gratis" langsung.
+- **Dokumen tamu ephemeral** — dokumen tamu otomatis dihapus (soft-delete) saat meninggalkan beranda. Hasil analisis hanya tersedia dalam satu sesi.
+- **Konversi akun** — tamu yang mendaftar via email atau Google dikonversi dari akun anonymous menggunakan `linkWithCredential` agar data tidak yatim.
+- **Device ID persistence** — backend mengaitkan sesi tamu via `X-Device-ID` header untuk menjaga kontinuitas kuota antar login anonymous.
+- **CI/CD** — tiga workflow GitHub Actions: `flutter-ci.yml` (analyze, test, build APK), `frontend-ci.yml` (analyze, test), `backend-ci.yml` (backend tests).
+- Backend menyimpan file asli dokumen di PostgreSQL / S3 (MinIO) dan menyediakan download via endpoint file.
+- Alur auth backend berbasis Firebase token verification dengan auto-provision user lokal + race-condition guard.
+- Pemrosesan dokumen berjalan sebagai background task dengan retry ke NLP service, disertai refund kuota jika gagal.
+- NLP pipeline: OCR → preprocessing → chunking → embedding → RAG → LLM analysis (Claude primary, NVIDIA NIM fallback).
 
 ## Arsitektur
 
@@ -65,12 +71,18 @@ Base URL Backend: `http://127.0.0.1:8000/api/v1`
 - `GET /auth/me`
 - `POST /documents/upload`
 - `GET /documents`
+- `GET /documents/count`
+- `GET /documents/search?q=query`
 - `GET /documents/{document_id}`
 - `GET /documents/{document_id}/status`
 - `GET /documents/{document_id}/text`
 - `GET /documents/{document_id}/analysis`
 - `GET /documents/{document_id}/file`
 - `DELETE /documents/{document_id}`
+- `POST /chat/{document_id}/message`
+- `GET /chat/{document_id}/history`
+- `GET /guest/quota`
+- `DELETE /guest/documents`
 
 Base URL NLP: `http://127.0.0.1:8001`
 
@@ -171,19 +183,19 @@ pytest tests -v
 
 ## Catatan Implementasi Saat Ini
 
-- Frontend untuk chat AI dan history dokumen masih tahap lanjutan (belum end-to-end).
+- Guest mode sudah end-to-end: onboarding → guest sign-in → upload → analisis → chat → cleanup. Kuota 5 analisis dilacak di backend (`guest_quotas` table).
 - `docker-compose.yml` sudah ada, tetapi Dockerfile untuk service backend/NLP belum tersedia di repo ini.
-- CI GitHub saat ini fokus ke backend test subset (`.github/workflows/backend-ci.yml`).
+- CI GitHub mencakup tiga workflow: `backend-ci.yml`, `frontend-ci.yml`, `flutter-ci.yml` (analyze + test + build APK).
 
 ## Tim Pengembang
 
-| Nama | NIM | Peran |
-| --- | --- | --- |
-| Ester Faninta | 2301020053 | Frontend (Flutter, Firebase Auth) |
-| Fiana Wahyu Laura | 2301020082 | Frontend (Flutter, Firebase Auth) |
+| Nama                 | NIM        | Peran                                  |
+| -------------------- | ---------- | -------------------------------------- |
+| Ester Faninta        | 2301020053 | Frontend (Flutter, Firebase Auth)      |
+| Fiana Wahyu Laura    | 2301020082 | Frontend (Flutter, Firebase Auth)      |
 | Masry Ryzki Yanditar | 2301020087 | Backend (FastAPI, PostgreSQL, Storage) |
-| Jamalludin | 2301020075 | Backend (FastAPI, PostgreSQL, Storage) |
-| Indra Sugara | 2301020084 | NLP/AI (OCR, RAG, LLM, ChromaDB) |
+| Jamalludin           | 2301020075 | Backend (FastAPI, PostgreSQL, Storage) |
+| Indra Sugara         | 2301020084 | NLP/AI (OCR, RAG, LLM, ChromaDB)       |
 
 ## Mata Kuliah
 
