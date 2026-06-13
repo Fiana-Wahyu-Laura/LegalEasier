@@ -5,9 +5,9 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>LegalEasy membutuhkan akses kamera untuk scan dokumen.</string>
+	<string>LegalEasier membutuhkan akses kamera untuk scan dokumen.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>LegalEasy membutuhkan akses file untuk upload dokumen.</string>
+	<string>LegalEasier membutuhkan akses file untuk upload dokumen.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

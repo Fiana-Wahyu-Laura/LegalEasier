@@ -156,7 +156,7 @@ class AppRouter {
             builder: (context, state) {
               final documentId = state.pathParameters['id']!;
               final documentTitle =
-                  state.uri.queryParameters['title'] ?? 'Chat AI LegalEasy';
+                  state.uri.queryParameters['title'] ?? 'Chat AI LegalEasier';
               return ChatScreen(
                 documentId: documentId,
                 documentTitle: documentTitle,

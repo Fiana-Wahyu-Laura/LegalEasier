@@ -31,7 +31,7 @@ class TrialBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Coba gratis LegalEasy',
+                  'Coba gratis LegalEasier',
                   style: AppTextStyles.label.copyWith(
                     fontWeight: FontWeight.w600,
                   ),

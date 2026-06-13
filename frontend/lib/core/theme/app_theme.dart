@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// LegalEasy Design System Color Palette
+/// LegalEasier Design System Color Palette
 class AppColors {
   // Brand
   static const Color brand = Color(0xFF1A3A4A);        // Navy gelap
@@ -51,7 +51,7 @@ class AppColors {
   static const Color gateIcon = Color(0xFFBA7517);
 }
 
-/// LegalEasy Design System - Text Styles
+/// LegalEasier Design System - Text Styles
 class AppTextStyles {
   // Headings (Fraunces)
   static const splashHeadline = TextStyle(

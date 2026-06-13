@@ -130,7 +130,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'LegalEasy AI',
+                    'LegalEasier AI',
                     style: AppTextStyles.label.copyWith(
                       fontWeight: FontWeight.w600,
                       color: AppColors.text1,
@@ -327,7 +327,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              'Tanya AI LegalEasy',
+              'Tanya AI LegalEasier',
               style: AppTextStyles.screenTitle.copyWith(fontSize: 18),
               textAlign: TextAlign.center,
             ),
