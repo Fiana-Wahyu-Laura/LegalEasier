@@ -96,88 +96,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ),
         ],
       ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            left: 23,
-            top: 24,
-            child: Transform.rotate(
-              angle: -0.08,
-              child: Container(
-                width: 42,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Container(height: 2.5, width: 18, color: AppColors.brand),
-                    const SizedBox(height: 4),
-                    Container(height: 2.5, width: 14, color: AppColors.brand2),
-                    const SizedBox(height: 4),
-                    Container(height: 2.5, width: 16, color: AppColors.brand),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 41,
-            top: 18,
-            child: Transform.rotate(
-              angle: 0.08,
-              child: Container(
-                width: 42,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.35),
-                    width: 1,
-                  ),
-                ),
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Container(height: 2.5, width: 18, color: AppColors.brand2),
-                    const SizedBox(height: 4),
-                    Container(height: 2.5, width: 14, color: AppColors.brand2),
-                    const SizedBox(height: 4),
-                    Container(height: 2.5, width: 16, color: AppColors.brand2),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 10,
-            bottom: 10,
-            child: Container(
-              width: 26,
-              height: 26,
-              decoration: const BoxDecoration(
-                color: AppColors.accent,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                'AI',
-                style: TextStyle(
-                  fontFamily: 'DM Sans',
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.brand,
-                ),
-              ),
-            ),
-          ),
-        ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(25),
+        child: Image.asset(
+          'assets/images/LOGO.png',
+          width: 104,
+          height: 104,
+          fit: BoxFit.cover,
+        ),
       ),
     );
   }

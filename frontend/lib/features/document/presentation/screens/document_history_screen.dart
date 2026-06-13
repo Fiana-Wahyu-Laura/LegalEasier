@@ -92,7 +92,7 @@ class _DocumentHistoryScreenState extends ConsumerState<DocumentHistoryScreen> {
             ),
             trailing: const Icon(Icons.chevron_right, color: AppColors.text3),
             onTap: () {
-              context.go('/documents/${document.id}/analysis?title=$encodedTitle');
+              context.push('/documents/${document.id}/analysis?title=$encodedTitle');
             },
           );
         },

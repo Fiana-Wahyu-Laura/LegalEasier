@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -42,6 +43,13 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Guest (anonymous) sessions are ephemeral — sign them out on restart.
+  // Registered users stay logged in and skip straight to home.
+  final currentUser = FirebaseAuth.instance.currentUser;
+  if (currentUser != null && currentUser.isAnonymous) {
+    await FirebaseAuth.instance.signOut();
+  }
 
   runApp(const ProviderScope(child: LegalEasierApp()));
 }

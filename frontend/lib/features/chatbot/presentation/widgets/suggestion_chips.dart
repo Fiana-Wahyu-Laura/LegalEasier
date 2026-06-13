@@ -16,19 +16,30 @@ class SuggestionChips extends StatelessWidget {
     return Container(
       width: double.infinity,
       color: AppColors.pageBackground,
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
       child: Wrap(
-        spacing: 10,
-        runSpacing: 8,
+        spacing: 6,
+        runSpacing: 6,
         children: suggestions.map((suggestion) {
-          return ActionChip(
-            label: Text(
-              suggestion,
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.brand),
+          return GestureDetector(
+            onTap: () => onSelected(suggestion),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  width: 0.5,
+                ),
+              ),
+              child: Text(
+                suggestion,
+                style:
+                    AppTextStyles.chipText.copyWith(color: AppColors.brand2),
+              ),
             ),
-            backgroundColor: AppColors.white,
-            labelPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            onPressed: () => onSelected(suggestion),
           );
         }).toList(),
       ),
