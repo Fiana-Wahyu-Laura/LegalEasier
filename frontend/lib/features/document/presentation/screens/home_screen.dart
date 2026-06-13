@@ -343,7 +343,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           icon: Icons.chat_bubble_outline,
           iconColor: AppColors.chatIcon,
           bgColor: AppColors.chatBg,
-          title: 'Tanya AI\nLegalEasy',
+          title: 'Tanya AI\nLegalEasier',
           locked: isGuestUser,
           onTap: () => _onChatTap(
             isGuestUser: isGuestUser,
