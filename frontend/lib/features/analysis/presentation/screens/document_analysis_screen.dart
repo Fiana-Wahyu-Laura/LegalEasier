@@ -10,6 +10,7 @@ import 'package:legaleasier/features/analysis/presentation/widgets/analysis_disc
 import 'package:legaleasier/features/analysis/presentation/widgets/analysis_summary_card.dart';
 import 'package:legaleasier/features/analysis/presentation/widgets/risk_clause_card.dart';
 import 'package:legaleasier/features/analysis/presentation/widgets/risk_overview_card.dart';
+import 'package:legaleasier/features/auth/presentation/providers/auth_provider.dart';
 
 class DocumentAnalysisScreen extends ConsumerStatefulWidget {
   final String documentId;
@@ -129,13 +130,31 @@ class _DocumentAnalysisScreenState
       _consecutiveErrors = 0;
     }
 
+    final authAsync = ref.watch(authNotifierProvider);
+    final isGuest = authAsync.maybeWhen(
+      data: (user) => user?.isGuest ?? true,
+      orElse: () => true,
+    );
+
     final chatFab = analysisAsyncValue.maybeWhen(
       data: (analysis) {
         if (analysis == null) return null;
+
+        if (isGuest) {
+          // Guest users: show lock icon, redirect to limit-gate
+          return FloatingActionButton.extended(
+            onPressed: () => context.go('/limit-gate'),
+            backgroundColor: AppColors.soft,
+            foregroundColor: AppColors.text2,
+            icon: const Icon(Icons.lock_outline, size: 18),
+            label: const Text('Tanya AI'),
+          );
+        }
+
         return FloatingActionButton.extended(
           onPressed: () {
             final encodedTitle = Uri.encodeComponent(widget.documentTitle);
-            context.go(
+            context.push(
                 '/documents/${widget.documentId}/chat?title=$encodedTitle');
           },
           icon: const Icon(Icons.chat_bubble_outline),

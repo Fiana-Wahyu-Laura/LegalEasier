@@ -28,6 +28,11 @@ class AppColors {
   static const Color ok = Color(0xFF1E8449);           // Aman / Rendah
   static const Color success = ok;
 
+  // Risk badge backgrounds
+  static const Color dangerBg = Color(0xFFFDECEA);
+  static const Color warnBg = Color(0xFFFEF9E7);
+  static const Color okBg = Color(0xFFEAFAF1);
+
   // Quick action backgrounds
   static const Color uploadBg = Color(0xFFD5EDE8);
   static const Color scanBg = Color(0xFFD8E9F8);

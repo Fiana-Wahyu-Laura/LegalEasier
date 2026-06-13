@@ -114,7 +114,7 @@ class RecentDocumentsSection extends ConsumerWidget {
     return GestureDetector(
       onTap: () {
         final encodedTitle = Uri.encodeComponent(document.filename);
-        context.go('/documents/${document.id}/analysis?title=$encodedTitle');
+        context.push('/documents/${document.id}/analysis?title=$encodedTitle');
       },
       child: Container(
         width: double.infinity,

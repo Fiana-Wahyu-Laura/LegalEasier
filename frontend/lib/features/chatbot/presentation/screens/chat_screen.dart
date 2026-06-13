@@ -101,16 +101,69 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.documentTitle),
-        actions: [
-          IconButton(
-            onPressed: () {
-              ref.invalidate(chatNotifierProvider(widget.documentId));
-            },
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Muat ulang',
+        automaticallyImplyLeading: true,
+        backgroundColor: AppColors.white,
+        elevation: 0,
+        titleSpacing: 0,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.text2, size: 20),
+            onPressed: () => Navigator.of(context).pop(),
           ),
-        ],
+        ),
+        title: Row(
+          children: [
+            // Bot avatar
+            ClipOval(
+              child: Image.asset(
+                'assets/images/LOGO.png',
+                width: 36,
+                height: 36,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Name + status
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'LegalEasy AI',
+                    style: AppTextStyles.label.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.text1,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: AppColors.ok,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          'Online · ${widget.documentTitle}',
+                          style: AppTextStyles.meta.copyWith(
+                            color: AppColors.ok,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
       body: Column(
         children: [
@@ -142,25 +195,48 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
 
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: const InputDecoration(
-                      hintText: 'Tulis pertanyaan Anda...',
-                      border: OutlineInputBorder(),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.pageBackground,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFFEDEDED),
+                        width: 1.5,
+                      ),
                     ),
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _sendMessage(),
+                    child: TextField(
+                      controller: _messageController,
+                      decoration: const InputDecoration(
+                        hintText: 'Ketik pertanyaanmu...',
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                      ),
+                      style: AppTextStyles.bodyMedium,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _sendMessage(),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  color: isSending ? AppColors.text3 : AppColors.brand,
-                  onPressed: isSending ? null : _sendMessage,
+                const SizedBox(width: 8),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: isSending ? AppColors.text3 : AppColors.brand2,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.send, size: 16),
+                    color: AppColors.white,
+                    padding: EdgeInsets.zero,
+                    onPressed: isSending ? null : _sendMessage,
+                  ),
                 ),
               ],
             ),
@@ -284,12 +360,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildExampleChip(String label) {
-    return ActionChip(
-      label: Text(label, style: AppTextStyles.bodySmall.copyWith(fontSize: 12)),
-      onPressed: () {
+    return GestureDetector(
+      onTap: () {
         _messageController.text = label;
         _sendMessage();
       },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.black.withValues(alpha: 0.1),
+            width: 0.5,
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.chipText.copyWith(color: AppColors.brand2),
+        ),
+      ),
     );
   }
 

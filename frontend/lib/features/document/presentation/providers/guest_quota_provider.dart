@@ -35,13 +35,6 @@ class GuestQuotaNotifier extends AsyncNotifier<int> {
       final repository = ref.read(documentRepositoryProvider);
       final quota = await repository.getGuestQuota();
 
-      final isGuest = quota['is_guest'] as bool? ?? false;
-      if (!isGuest) {
-        // Registered user — no quota limit needed
-        state = const AsyncValue.data(999);
-        return;
-      }
-
       final remaining = quota['remaining'] as int? ?? _defaultGuestFreeAnalyses;
       await _preferences.setInt(_guestFreeAnalysesKey, remaining);
       state = AsyncValue.data(remaining);
