@@ -186,23 +186,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             width: 1.2,
                           ),
                         ),
-                        icon: Container(
-                          width: 18,
-                          height: 18,
-                          decoration: const BoxDecoration(
-                            color: AppColors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Center(
-                            child: Text(
-                              'G',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.brand,
-                              ),
-                            ),
-                          ),
+                        icon: Image.asset(
+                          'assets/icons/icon-google.png',
+                          width: 20,
+                          height: 20,
                         ),
                         label: const Text('Daftar dengan Google'),
                       ),

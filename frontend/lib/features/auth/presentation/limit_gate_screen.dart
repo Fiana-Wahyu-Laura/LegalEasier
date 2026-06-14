@@ -114,7 +114,11 @@ class _LimitGateScreenState extends ConsumerState<LimitGateScreen> {
                       width: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.g_mobiledata, size: 20),
+                  : Image.asset(
+                      'assets/icons/icon-google.png',
+                      width: 20,
+                      height: 20,
+                    ),
               label: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Text(

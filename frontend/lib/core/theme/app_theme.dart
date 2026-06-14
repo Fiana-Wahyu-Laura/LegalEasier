@@ -210,13 +210,13 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.pageBg,
       
       // App Bar
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         elevation: 0,
         backgroundColor: AppColors.brand,
         foregroundColor: AppColors.white,
         surfaceTintColor: Colors.transparent,
-        iconTheme: IconThemeData(color: AppColors.white),
-        titleTextStyle: AppTextStyles.screenTitle,
+        iconTheme: const IconThemeData(color: AppColors.white),
+        titleTextStyle: AppTextStyles.screenTitle.copyWith(color: AppColors.white),
         centerTitle: false,
       ),
 
