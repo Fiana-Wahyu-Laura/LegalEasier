@@ -7,12 +7,20 @@ import 'package:legaleasier/features/document/domain/document.dart';
 import 'package:legaleasier/features/document/presentation/providers/document_provider.dart';
 
 /// Chat landing screen — shown when the Chat tab in bottom nav is tapped.
-/// Lists documents available for AI chat.
-class ChatListScreen extends ConsumerWidget {
+/// Lists documents available for AI chat with progressive loading.
+class ChatListScreen extends ConsumerStatefulWidget {
   const ChatListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ChatListScreen> createState() => _ChatListScreenState();
+}
+
+class _ChatListScreenState extends ConsumerState<ChatListScreen> {
+  int _visibleCount = 8;
+  static const _batchSize = 8;
+
+  @override
+  Widget build(BuildContext context) {
     final documentsAsync = ref.watch(recentDocumentsProvider);
 
     return Scaffold(
@@ -35,11 +43,47 @@ class ChatListScreen extends ConsumerWidget {
             return _buildEmptyState(context);
           }
 
+          final visibleDocs = analyzableDocs.length <= _visibleCount
+              ? analyzableDocs
+              : analyzableDocs.take(_visibleCount).toList();
+          final hasMore = _visibleCount < analyzableDocs.length;
+          final remaining = analyzableDocs.length - _visibleCount;
+
           return ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: analyzableDocs.length,
+            itemCount: visibleDocs.length + (hasMore ? 1 : 0),
             itemBuilder: (context, index) {
-              final doc = analyzableDocs[index];
+              if (hasMore && index == visibleDocs.length) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () =>
+                          setState(() => _visibleCount += _batchSize),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.brand2,
+                        side: const BorderSide(
+                          color: AppColors.brand2,
+                          width: 1,
+                        ),
+                        minimumSize: const Size(double.infinity, 44),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Lihat $remaining dokumen lainnya →',
+                        style: AppTextStyles.label.copyWith(
+                          color: AppColors.brand2,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }
+              final doc = visibleDocs[index];
               return _buildDocumentItem(context, doc);
             },
           );

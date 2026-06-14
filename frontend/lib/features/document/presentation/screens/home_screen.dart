@@ -68,30 +68,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               userInitial: userInitial,
               isGuestUser: isGuestUser,
               remainingQuota: remainingQuota,
+              recentDocumentsAsync: recentDocumentsAsync,
+              freeAnalysisValue: freeAnalysisValue,
+              freeAnalysisLabel: freeAnalysisLabel,
             ),
 
             // ── Body ──
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 16),
-
-                  // Quick stats (3 stat boxes)
-                  _buildStatRow(
-                    recentDocumentsAsync: recentDocumentsAsync,
-                    freeAnalysisValue: freeAnalysisValue,
-                    freeAnalysisLabel: freeAnalysisLabel,
-                  ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
 
                   // Quick actions grid
                   Text(
                     'Mulai dari sini',
                     style: AppTextStyles.sectionTitle.copyWith(fontSize: 18),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 6),
                   _buildQuickActionsGrid(
                     isGuestUser: isGuestUser,
                     canUseFreeAnalysis: canUseFreeAnalysis,
@@ -99,10 +94,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     recentDocumentsAsync: recentDocumentsAsync,
                   ),
 
-                  // Recent documents — registered users only
+                  // Recent documents — registered users only (compact, max 3)
                   if (!isGuestUser) ...[
                     const SizedBox(height: 24),
-                    const RecentDocumentsSection(),
+                    const RecentDocumentsSection(maxItems: 3),
                     const SizedBox(height: 24),
                   ] else
                     const SizedBox(height: 24),
@@ -122,16 +117,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     required String userInitial,
     required bool isGuestUser,
     required int remainingQuota,
+    required AsyncValue<List<Document>> recentDocumentsAsync,
+    required String freeAnalysisValue,
+    required String freeAnalysisLabel,
   }) {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
         color: AppColors.brand,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(20),
+          bottomRight: Radius.circular(20),
+        ),
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -200,6 +202,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const SizedBox(height: 14),
                 _buildTrialBanner(remainingQuota),
               ],
+
+              // Quick stats (3 stat boxes) — inside navy header
+              const SizedBox(height: 20),
+              _buildStatRow(
+                recentDocumentsAsync: recentDocumentsAsync,
+                freeAnalysisValue: freeAnalysisValue,
+                freeAnalysisLabel: freeAnalysisLabel,
+              ),
             ],
           ),
         ),
@@ -307,8 +317,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }) {
     return GridView.count(
       crossAxisCount: 2,
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       children: [

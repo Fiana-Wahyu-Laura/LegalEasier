@@ -17,6 +17,8 @@ class _DocumentHistoryScreenState extends ConsumerState<DocumentHistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   String? _selectedRisk;
   bool _onlyAnalyzed = false;
+  int _visibleCount = 10;
+  static const _batchSize = 10;
 
   @override
   void dispose() {
@@ -192,11 +194,47 @@ class _DocumentHistoryScreenState extends ConsumerState<DocumentHistoryScreen> {
         );
       }
 
+      final visibleDocs = filtered.length <= _visibleCount
+          ? filtered
+          : filtered.take(_visibleCount).toList();
+      final hasMore = _visibleCount < filtered.length;
+      final remaining = filtered.length - _visibleCount;
+
       return ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: filtered.length,
+        itemCount: visibleDocs.length + (hasMore ? 1 : 0),
         itemBuilder: (context, index) {
-          final document = filtered[index];
+          if (hasMore && index == visibleDocs.length) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => setState(
+                      () => _visibleCount += _batchSize),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.brand2,
+                    side: const BorderSide(
+                      color: AppColors.brand2,
+                      width: 1,
+                    ),
+                    minimumSize: const Size(double.infinity, 44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Lihat $remaining dokumen lainnya →',
+                    style: AppTextStyles.label.copyWith(
+                      color: AppColors.brand2,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+          final document = visibleDocs[index];
           return _buildDocumentItem(context, document);
         },
       );

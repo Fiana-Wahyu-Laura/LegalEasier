@@ -5,9 +5,13 @@ import 'package:legaleasier/core/theme/app_theme.dart';
 import 'package:legaleasier/features/document/domain/document.dart';
 import 'package:legaleasier/features/document/presentation/providers/document_provider.dart';
 
-/// Recent documents section di home screen
+/// Recent documents section di home screen.
+///
+/// When [maxItems] is provided, only the first [maxItems] documents are shown
+/// and a "Lihat lebih banyak →" link is displayed below them.
 class RecentDocumentsSection extends ConsumerWidget {
-  const RecentDocumentsSection({super.key});
+  final int? maxItems;
+  const RecentDocumentsSection({super.key, this.maxItems});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -16,11 +20,28 @@ class RecentDocumentsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Dokumen Terbaru',
-          style: AppTextStyles.cardTitle.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Dokumen Terbaru',
+                style: AppTextStyles.cardTitle.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            if (maxItems != null)
+              GestureDetector(
+                onTap: () => context.go('/history'),
+                child: Text(
+                  'Lihat semua →',
+                  style: AppTextStyles.meta.copyWith(
+                    color: AppColors.brand2,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 12),
         recentDocumentsAsync.when(
@@ -56,6 +77,7 @@ class RecentDocumentsSection extends ConsumerWidget {
             ),
           ),
           data: (documents) {
+            final limit = maxItems;
             if (documents.isEmpty) {
               return Container(
                 decoration: BoxDecoration(
@@ -94,10 +116,43 @@ class RecentDocumentsSection extends ConsumerWidget {
               );
             }
 
+            final displayDocs = limit != null && documents.length > limit
+                ? documents.take(limit).toList()
+                : documents;
+
             return Column(
-              children: documents
-                  .map((document) => _buildDocumentItem(context, document))
-                  .toList(),
+              children: [
+                ...displayDocs.map(
+                    (document) => _buildDocumentItem(context, document)),
+                if (limit != null && documents.length > limit)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => context.go('/history'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.brand2,
+                          side: const BorderSide(
+                            color: AppColors.brand2,
+                            width: 1,
+                          ),
+                          minimumSize: const Size(double.infinity, 44),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Lihat ${documents.length - limit} dokumen lainnya →',
+                          style: AppTextStyles.label.copyWith(
+                            color: AppColors.brand2,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             );
           },
         ),
