@@ -50,7 +50,7 @@ def translate_clause(clause_text: str, context: str = "") -> str:
     user_prompt = build_translation_user_prompt(clause_text, context)
 
     try:
-        result = call_llm(TRANSLATION_SYSTEM_PROMPT, user_prompt)
+        result = call_llm(TRANSLATION_SYSTEM_PROMPT, user_prompt, use_case="translation")
         return result.strip()
     except RuntimeError as exc:
         logger.error("Gagal menerjemahkan klausul: %s", exc)

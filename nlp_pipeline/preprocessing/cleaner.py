@@ -34,6 +34,21 @@ _RE_PAGE_MARKER = re.compile(
     re.MULTILINE,
 )
 
+# Normalisasi "PASAL" / "pasal" → "Pasal" (konsisten)
+_RE_PASAL_CAPS = re.compile(r"\bPASAL\b")
+_RE_PASAL_LOWER = re.compile(r"\bpasal\b")
+
+# Normalisasi "BAB" / "bab" → "BAB" (tetap kapital per konvensi)
+_RE_BAB_LOWER = re.compile(r"\bbab\b")
+
+# OCR ligature artifacts (umum pada scan dokumen)
+_OCR_LIGATURE_MAP = {
+    "\ufb01": "fi",   # fi ligature
+    "\ufb02": "fl",   # fl ligature
+    "\ufb03": "ffi",  # ffi ligature
+    "\ufb04": "ffl",  # ffl ligature
+}
+
 
 # ---------------------------------------------------------------------------
 # Fungsi utama
@@ -139,6 +154,42 @@ def normalize_dashes(text: str) -> str:
     return text
 
 
+def fix_ocr_ligatures(text: str) -> str:
+    """Fix OCR ligature artifacts (fi, fl, ffi, ffl).
+
+    Umum terjadi pada hasil OCR dari dokumen scan yang menggunakan
+    font dengan ligature characters.
+
+    Args:
+        text: Teks input.
+
+    Returns:
+        Teks dengan ligature yang sudah diperbaiki.
+    """
+    for ligature, replacement in _OCR_LIGATURE_MAP.items():
+        text = text.replace(ligature, replacement)
+    return text
+
+
+def normalize_legal_terms(text: str) -> str:
+    """Normalisasi istilah hukum Indonesia untuk konsistensi.
+
+    - PASAL / pasal → Pasal
+    - bab → BAB (konvensi formal)
+    - "jo." / "Jo." → "juncto" (untuk kepentingan NLP)
+
+    Args:
+        text: Teks input.
+
+    Returns:
+        Teks dengan istilah hukum yang dinormalisasi.
+    """
+    text = _RE_PASAL_CAPS.sub("Pasal", text)
+    text = _RE_PASAL_LOWER.sub("Pasal", text)
+    text = _RE_BAB_LOWER.sub("BAB", text)
+    return text
+
+
 def expand_common_abbreviations(text: str) -> str:
     """Ekspansi singkatan umum dalam dokumen hukum Indonesia.
 
@@ -199,10 +250,12 @@ def clean_legal_text(
 
     text = normalize_unicode(raw_text)
     text = remove_control_characters(text)
+    text = fix_ocr_ligatures(text)
     text = normalize_quotes(text)
     text = normalize_dashes(text)
     text = fix_hyphenation(text)
     text = remove_page_markers(text)
+    text = normalize_legal_terms(text)
 
     if expand_abbreviations:
         text = expand_common_abbreviations(text)

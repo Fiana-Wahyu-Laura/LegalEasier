@@ -45,13 +45,14 @@ class TestChatbotPrompt:
         assert "Chunk 1" in prompt
         assert "Chunk 2" in prompt
 
-    def test_build_chatbot_user_prompt_mentions_history_count(self) -> None:
+    def test_build_chatbot_user_prompt_includes_history_content(self) -> None:
         prompt = build_chatbot_user_prompt(
             "Apa sanksinya?",
             ["Chunk"],
             [{"role": "user", "content": "Halo"}],
         )
-        assert "1 pesan" in prompt
+        # New prompt includes actual history content instead of just count
+        assert "Pengguna: Halo" in prompt
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -235,19 +236,27 @@ class TestLLMClient:
             mock_nim.assert_not_called()
 
     def test_call_llm_fallback_to_nim(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Clear LLM cache to prevent stale results from previous tests
+        from llm._client import _response_cache
+        _response_cache.clear()
+
         monkeypatch.setattr(settings, "claude_api_key", "key")
         monkeypatch.setattr(settings, "nim_api_key", "nim")
         with patch("llm._client._call_claude", side_effect=RuntimeError("fail")):
             with patch("llm._client._call_nim") as mock_nim:
                 mock_nim.return_value = "nim-ok"
-                result = call_llm("sys", "user")
+                result = call_llm("sys", "user", use_cache=False)
                 assert result == "nim-ok"
 
     def test_call_llm_without_keys_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Clear LLM cache to prevent stale results from previous tests
+        from llm._client import _response_cache
+        _response_cache.clear()
+
         monkeypatch.setattr(settings, "claude_api_key", "")
         monkeypatch.setattr(settings, "nim_api_key", "")
         with pytest.raises(RuntimeError, match="LLM API key"):
-            call_llm("sys", "user")
+            call_llm("sys", "user", use_cache=False)
 
     def test_call_llm_with_history_prefers_claude(
         self, monkeypatch: pytest.MonkeyPatch

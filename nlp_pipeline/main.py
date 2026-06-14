@@ -27,21 +27,22 @@ Rules (CLAUDE.md):
 """
 
 import logging
+import time
 import uuid
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import Response
 
 from core.config import settings
 from ocr.image_ocr import extract_text_from_image, extract_text_from_pdf_scan
 from ocr.pdf_extractor import extract_text_from_pdf
 from preprocessing.cleaner import clean_legal_text
 from preprocessing.splitter import split_text
-from preprocessing.tokenizer import tokenize_text
 from rag.chunker import chunk_text
-from rag.embedder import embed_chunks
+from rag.embedder import embed_chunks, warmup_embedding_model
 from rag.retriever import retrieve_all_chunks, retrieve_relevant_chunks
 from rag.vector_store import delete_document_collection, get_collection_info, store_chunks
 from llm.analyzer import analyze_document
@@ -81,6 +82,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Jalankan startup/shutdown tasks."""
     logger.info("NLP Pipeline service dimulai di port %d.", settings.service_port)
+    # Warmup embedding model to avoid cold-start latency
+    warmup_embedding_model()
     yield
     logger.info("NLP Pipeline service dihentikan.")
 
@@ -110,6 +113,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Timing middleware — log dan return processing time
+# ---------------------------------------------------------------------------
+
+@app.middleware("http")
+async def add_processing_time(request: Request, call_next) -> Response:
+    """Add X-Processing-Time header to all responses."""
+    start = time.perf_counter()
+    response = await call_next(request)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    response.headers["X-Processing-Time"] = f"{elapsed_ms:.0f}ms"
+    logger.info(
+        "%s %s — %.0fms",
+        request.method, request.url.path, elapsed_ms,
+    )
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -362,21 +383,23 @@ async def nlp_process(
             detail="Gagal membersihkan teks dokumen.",
         ) from exc
 
-    # ── Langkah 3: Tokenization + Sentence Splitting ─────────────────────
-    logger.info("[%s] Langkah 3/7: Tokenization & sentence splitting...", document_id)
+    # ── Langkah 3: Sentence Splitting (lightweight — no SpaCy) ────────────
+    logger.info("[%s] Langkah 3/7: Sentence splitting...", document_id)
     try:
-        token_result = tokenize_text(cleaned_text)
         split_result = split_text(cleaned_text, method="nltk")
     except (ValueError, RuntimeError) as exc:
-        logger.error("[%s] Gagal tokenisasi/splitting: %s", document_id, exc)
+        logger.error("[%s] Gagal splitting: %s", document_id, exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Gagal memproses teks: tokenisasi atau sentence splitting gagal.",
+            detail="Gagal memproses teks: sentence splitting gagal.",
         ) from exc
+
+    # Lightweight token count (word-based, avoids SpaCy overhead)
+    token_count = len(cleaned_text.split())
 
     preprocessing_result = PreprocessingResult(
         cleaned_text=cleaned_text,
-        token_count=token_result.token_count,
+        token_count=token_count,
         sentence_count=split_result.sentence_count,
         char_count=len(cleaned_text),
     )
@@ -475,7 +498,7 @@ async def nlp_process(
         "[%s] NLP pipeline selesai: %d token, %d kalimat, %d chunk, "
         "%d klausul berisiko, risk_score=%d.",
         document_id,
-        token_result.token_count,
+        token_count,
         split_result.sentence_count,
         stored_count,
         len(risk_clause_schemas),

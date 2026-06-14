@@ -19,6 +19,8 @@ Aturan:
 import logging
 from typing import Optional
 
+from core.config import settings
+
 import numpy as np
 from numpy.typing import NDArray
 from sentence_transformers import SentenceTransformer
@@ -31,8 +33,10 @@ logger = logging.getLogger(__name__)
 
 _embedding_model: Optional[SentenceTransformer] = None
 
-EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
-EMBEDDING_DIMENSION = 384  # Dimensi output model all-MiniLM-L6-v2
+# Model name comes from settings — default: paraphrase-multilingual-MiniLM-L12-v2
+# This model supports 50+ languages including Indonesian (384 dims, same as MiniLM-L6-v2)
+EMBEDDING_MODEL_NAME = settings.embedding_model_name
+EMBEDDING_DIMENSION = 384
 
 
 def get_embedding_model() -> SentenceTransformer:
@@ -156,6 +160,17 @@ def embed_chunks(chunks: list[str], batch_size: int = 32) -> list[list[float]]:
         return result
     except Exception as exc:
         raise RuntimeError(f"Gagal melakukan batch embedding: {exc}") from exc
+
+
+def warmup_embedding_model() -> None:
+    """Pre-load embedding model saat startup agar request pertama tidak lambat."""
+    try:
+        model = get_embedding_model()
+        # Encode string pendek untuk warmup GPU/CPU pipeline
+        model.encode("warmup", show_progress_bar=False)
+        logger.info("Embedding model warmup selesai.")
+    except Exception as exc:
+        logger.warning("Warmup embedding model gagal (non-fatal): %s", exc)
 
 
 def compute_similarity(embedding_a: list[float], embedding_b: list[float]) -> float:

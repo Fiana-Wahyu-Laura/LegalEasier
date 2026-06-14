@@ -60,8 +60,8 @@ class TestChunkText:
             )
 
     def test_custom_chunk_size(self) -> None:
-        result_small = chunk_text(self.VALID_TEXT, chunk_size=100)
-        result_large = chunk_text(self.VALID_TEXT, chunk_size=1000)
+        result_small = chunk_text(self.VALID_TEXT, chunk_size=100, chunk_overlap=20)
+        result_large = chunk_text(self.VALID_TEXT, chunk_size=1000, chunk_overlap=50)
         # Chunk lebih kecil → lebih banyak chunk
         assert result_small.chunk_count >= result_large.chunk_count
 
