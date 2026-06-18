@@ -17,6 +17,8 @@ class _DocumentHistoryScreenState extends ConsumerState<DocumentHistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   String? _selectedRisk;
   bool _onlyAnalyzed = false;
+  int _visibleCount = 10;
+  static const _batchSize = 10;
 
   @override
   void dispose() {
@@ -37,6 +39,137 @@ class _DocumentHistoryScreenState extends ConsumerState<DocumentHistoryScreen> {
       if (_onlyAnalyzed && !d.hasAnalysis) return false;
       return true;
     }).toList();
+  }
+
+  Widget _buildDocumentItem(BuildContext context, Document document) {
+    final hasAnalysis = document.hasAnalysis;
+    final encodedTitle = Uri.encodeComponent(document.filename);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: () {
+            context.push('/documents/${document.id}/analysis?title=$encodedTitle');
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.black.withValues(alpha: 0.07),
+                width: 0.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                // Document icon
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.soft,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.description_outlined,
+                    size: 20,
+                    color: AppColors.brand,
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Document info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        document.filename,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          if (hasAnalysis && document.riskLevel != null) ...[
+                            _buildRiskBadge(document.riskLevel!),
+                            const SizedBox(width: 8),
+                          ],
+                          if (!hasAnalysis) ...[
+                            _buildAnalyzingBadge(),
+                            const SizedBox(width: 8),
+                          ],
+                          Text(
+                            _formatDate(document.uploadedAt),
+                            style: AppTextStyles.meta,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: AppColors.text3,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRiskBadge(String riskLevel) {
+    final (Color bg, Color text) = switch (riskLevel) {
+      'Tinggi' => (AppColors.dangerBg, AppColors.danger),
+      'Sedang' => (AppColors.warnBg, AppColors.warn),
+      _ => (AppColors.okBg, AppColors.ok),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        riskLevel,
+        style: AppTextStyles.badgeText.copyWith(color: text),
+      ),
+    );
+  }
+
+  Widget _buildAnalyzingBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.soft,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        'Belum dianalisis',
+        style: AppTextStyles.badgeText.copyWith(color: AppColors.text2),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+    if (diff.inDays == 0) return 'Hari ini';
+    if (diff.inDays == 1) return 'Kemarin';
+    if (diff.inDays < 7) return '${diff.inDays} hari lalu';
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   @override
@@ -61,40 +194,48 @@ class _DocumentHistoryScreenState extends ConsumerState<DocumentHistoryScreen> {
         );
       }
 
-      return ListView.separated(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        itemCount: filtered.length,
-        separatorBuilder: (context, index) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          final document = filtered[index];
-          final subtitle = document.hasAnalysis
-              ? 'Analisis tersedia • ${document.riskLevel ?? 'Aman'}'
-              : 'Analisis belum selesai';
-          final encodedTitle = Uri.encodeComponent(document.filename);
+      final visibleDocs = filtered.length <= _visibleCount
+          ? filtered
+          : filtered.take(_visibleCount).toList();
+      final hasMore = _visibleCount < filtered.length;
+      final remaining = filtered.length - _visibleCount;
 
-          return ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            tileColor: AppColors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Text(
-              document.filename,
-              style: AppTextStyles.bodyLarge.copyWith(
-                fontWeight: FontWeight.w600,
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: visibleDocs.length + (hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (hasMore && index == visibleDocs.length) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => setState(
+                      () => _visibleCount += _batchSize),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.brand2,
+                    side: const BorderSide(
+                      color: AppColors.brand2,
+                      width: 1,
+                    ),
+                    minimumSize: const Size(double.infinity, 44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Lihat $remaining dokumen lainnya →',
+                    style: AppTextStyles.label.copyWith(
+                      color: AppColors.brand2,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
-            ),
-            subtitle: Text(
-              subtitle,
-              style: AppTextStyles.meta.copyWith(
-                color: document.hasAnalysis ? AppColors.text1 : AppColors.text2,
-              ),
-            ),
-            trailing: const Icon(Icons.chevron_right, color: AppColors.text3),
-            onTap: () {
-              context.push('/documents/${document.id}/analysis?title=$encodedTitle');
-            },
-          );
+            );
+          }
+          final document = visibleDocs[index];
+          return _buildDocumentItem(context, document);
         },
       );
     }

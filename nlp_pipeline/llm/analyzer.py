@@ -111,6 +111,41 @@ def _extract_json_from_response(raw: str) -> dict:
     raise ValueError(f"Gagal meng-extract JSON dari response LLM: {text[:200]}...")
 
 
+def _repair_json(raw: str) -> str:
+    """Attempt to fix common JSON issues from LLM output.
+
+    Fixes:
+    - Trailing commas before ] or }
+    - Single quotes → double quotes (hati-hati dengan apostrophe)
+    - Missing closing braces/brackets
+    """
+    import re as _re
+
+    text = raw.strip()
+
+    # Remove trailing commas: ,] → ] and ,} → }
+    text = _re.sub(r",\s*]", "]", text)
+    text = _re.sub(r",\s*}", "}", text)
+
+    # Replace single quotes with double (only around keys/values, not in contractions)
+    # This is a heuristic — only do it if there are no double quotes at all
+    if '"' not in text and "'" in text:
+        text = text.replace("'", '"')
+
+    # Count and fix unbalanced braces
+    open_braces = text.count("{")
+    close_braces = text.count("}")
+    if open_braces > close_braces:
+        text += "}" * (open_braces - close_braces)
+
+    open_brackets = text.count("[")
+    close_brackets = text.count("]")
+    if open_brackets > close_brackets:
+        text += "]" * (open_brackets - close_brackets)
+
+    return text
+
+
 def _validate_risk_clause(clause_data: dict) -> RiskClause:
     """Validasi dan buat RiskClause dari dict.
 
@@ -165,7 +200,16 @@ def _parse_analysis_response(raw: str) -> AnalysisResult:
     Raises:
         ValueError: Jika response tidak bisa di-parse atau tidak valid.
     """
-    data = _extract_json_from_response(raw)
+    try:
+        data = _extract_json_from_response(raw)
+    except ValueError:
+        # Attempt repair before giving up
+        repaired = _repair_json(raw)
+        try:
+            data = _extract_json_from_response(repaired)
+            logger.info("JSON berhasil diperbaiki setelah repair.")
+        except ValueError:
+            raise
 
     summary = data.get("summary", "").strip()
     if not summary:
@@ -241,7 +285,11 @@ def analyze_document(
                 "[%s] LLM analysis attempt %d/%d...",
                 document_id, attempt, max_attempts,
             )
-            raw_response = call_llm(RISK_ANALYSIS_SYSTEM_PROMPT, user_prompt)
+            raw_response = call_llm(
+                RISK_ANALYSIS_SYSTEM_PROMPT,
+                user_prompt,
+                use_case="analysis",
+            )
             result = _parse_analysis_response(raw_response)
 
             logger.info(
@@ -256,6 +304,12 @@ def analyze_document(
                 "[%s] Parse error attempt %d: %s",
                 document_id, attempt, exc,
             )
+            # Log raw response for debugging
+            if 'raw_response' in dir():
+                logger.debug(
+                    "[%s] Raw LLM response (first 500 chars): %s",
+                    document_id, raw_response[:500] if raw_response else "(empty)",  # type: ignore[possibly-undefined]
+                )
             if attempt < max_attempts:
                 logger.info("[%s] Retry sekali sesuai CLAUDE.md §9...", document_id)
                 continue

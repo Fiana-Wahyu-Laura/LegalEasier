@@ -398,7 +398,9 @@ class TestComputeRiskScore:
     def test_single_sedang_high_confidence(self) -> None:
         clauses = [RiskClause("text", "plain", "Sedang", 1.0)]
         score = compute_risk_score(clauses)
-        assert score == 60
+        # base = 0.6*1.0*100 = 60, coverage = 1.0+(1/1*0.5) = 1.5
+        # final = 60*1.5 = 90
+        assert score == 90
 
     def test_single_rendah_high_confidence(self) -> None:
         clauses = [RiskClause("text", "plain", "Rendah", 1.0)]
@@ -412,8 +414,10 @@ class TestComputeRiskScore:
             RiskClause("t3", "p3", "Aman", 1.0),
         ]
         score = compute_risk_score(clauses)
-        # (1.0*0.9*100 + 0.25*0.8*100 + 0.0*1.0*100) / 3 = (90 + 20 + 0) / 3 ≈ 36.67
-        assert 35 <= score <= 40
+        # base = (90 + 20 + 0) / 3 = 36.67
+        # coverage = 1.0 + (1/3 * 0.5) = 1.167
+        # final = 36.67 * 1.167 ≈ 43
+        assert 40 <= score <= 45
 
     def test_scaling_3_tinggi(self) -> None:
         clauses = [
@@ -422,8 +426,8 @@ class TestComputeRiskScore:
             RiskClause("t3", "p3", "Tinggi", 0.7),
         ]
         score = compute_risk_score(clauses)
-        # avg = (90+80+70)/3 = 80. scaled = 80*1.2 = 96
-        assert score == 96
+        # base = (90+80+70)/3 = 80, coverage = 1.5, final = 120 → capped 100
+        assert score == 100
 
     def test_scaling_5_tinggi(self) -> None:
         clauses = [
@@ -431,8 +435,8 @@ class TestComputeRiskScore:
             for i in range(5)
         ]
         score = compute_risk_score(clauses)
-        # avg = 70. scaled = 70*1.4 = 98
-        assert score == 98
+        # base = 70, coverage = 1.5, final = 105 → capped 100
+        assert score == 100
 
     def test_score_capped_at_100(self) -> None:
         clauses = [

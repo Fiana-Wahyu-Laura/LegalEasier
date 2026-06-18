@@ -24,25 +24,29 @@ from dataclasses import dataclass, field
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from core.config import settings
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Konstanta chunking (CLAUDE.md §9)
 # ---------------------------------------------------------------------------
 
-DEFAULT_CHUNK_SIZE = 512     # karakter per chunk
-DEFAULT_CHUNK_OVERLAP = 50   # karakter overlap antar chunk
+DEFAULT_CHUNK_SIZE = settings.chunk_size        # karakter per chunk (configurable)
+DEFAULT_CHUNK_OVERLAP = settings.chunk_overlap   # karakter overlap antar chunk
 
 # Pemisah hierarkis — dari yang paling diutamakan ke paling kasar
 # Disesuaikan untuk dokumen hukum Indonesia
 _LEGAL_SEPARATORS = [
-    "\n\n",       # Paragraf terpisah (paling diutamakan)
-    "\nPasal ",   # Penanda pasal baru
-    "\n(",        # Penanda ayat baru: (1), (2), dst.
-    "\n",         # Baris baru
-    ". ",         # Akhir kalimat
-    " ",          # Kata
-    "",           # Karakter (fallback terakhir)
+    "\n\n",        # Paragraf terpisah (paling diutamakan)
+    "\nBAB ",      # Penanda bab (dokumen formal)
+    "\nBagian ",   # Penanda bagian (subdivisi bab)
+    "\nPasal ",    # Penanda pasal baru
+    "\n(",         # Penanda ayat baru: (1), (2), dst.
+    "\n",          # Baris baru
+    ". ",          # Akhir kalimat
+    " ",           # Kata
+    "",            # Karakter (fallback terakhir)
 ]
 
 

@@ -17,8 +17,10 @@ Aturan kode:
 """
 
 import logging
+import re
 from dataclasses import dataclass, field
 
+from core.config import settings
 from rag.embedder import embed_text
 from rag.vector_store import get_collection_if_exists
 
@@ -28,7 +30,7 @@ logger = logging.getLogger(__name__)
 # Konstanta
 # ---------------------------------------------------------------------------
 
-DEFAULT_TOP_K = 5  # Jumlah chunk paling relevan yang diambil per query
+DEFAULT_TOP_K = settings.retrieval_top_k  # configurable via .env
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +181,15 @@ def retrieve_relevant_chunks(
         min_similarity,
     )
 
+    # Re-rank: boost chunks yang mengandung keyword dari query
+    if len(filtered_chunks) > 1:
+        ranked = _rerank_by_keywords(
+            query, filtered_chunks, filtered_distances, filtered_metadatas
+        )
+        filtered_chunks = [r[0] for r in ranked]
+        filtered_distances = [r[1] for r in ranked]
+        filtered_metadatas = [r[2] for r in ranked]
+
     return RetrievalResult(
         query=query,
         chunks=filtered_chunks,
@@ -187,6 +198,39 @@ def retrieve_relevant_chunks(
         top_k=top_k,
         found_count=len(filtered_chunks),
     )
+
+
+def _rerank_by_keywords(
+    query: str,
+    chunks: list[str],
+    distances: list[float],
+    metadatas: list[dict],
+) -> list[tuple[str, float, dict]]:
+    """Re-rank chunks berdasarkan keyword overlap dengan query.
+
+    Setiap chunk mendapat bonus score berdasarkan berapa banyak
+    kata kunci dari query yang muncul di chunk tersebut.
+    Sangat berguna untuk pencarian term hukum spesifik ("Pasal 5", dll).
+    """
+    # Ekstrak kata kunci dari query (huruf/angka saja, >= 2 karakter)
+    query_terms = set(
+        t.lower() for t in re.findall(r"\b\w{2,}\b", query)
+    )
+    if not query_terms:
+        return list(zip(chunks, distances, metadatas))
+
+    scored: list[tuple[float, int, str, float, dict]] = []
+    for i, (chunk, dist, meta) in enumerate(zip(chunks, distances, metadatas)):
+        chunk_lower = chunk.lower()
+        # Count how many query terms appear in chunk
+        keyword_hits = sum(1 for t in query_terms if t in chunk_lower)
+        # Bonus: reduce distance by keyword hit ratio (max 0.3 reduction)
+        keyword_bonus = min(0.3, keyword_hits / max(len(query_terms), 1) * 0.3)
+        adjusted_distance = dist - keyword_bonus
+        scored.append((adjusted_distance, i, chunk, dist, meta))
+
+    scored.sort(key=lambda x: x[0])
+    return [(s[2], s[3], s[4]) for s in scored]
 
 
 def retrieve_all_chunks(document_id: str) -> list[str]:

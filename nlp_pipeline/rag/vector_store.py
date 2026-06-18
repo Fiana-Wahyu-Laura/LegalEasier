@@ -82,6 +82,9 @@ def _collection_name(document_id: str) -> str:
 def get_collection_if_exists(document_id: str) -> Optional[Collection]:
     """Ambil collection jika sudah ada (tanpa auto-create).
 
+    Menggunakan get_collection() langsung (O(1)) alih-alih
+    list_collections() + iterate (O(n)).
+
     Args:
         document_id: UUID dokumen dari backend.
 
@@ -90,7 +93,7 @@ def get_collection_if_exists(document_id: str) -> Optional[Collection]:
 
     Raises:
         ValueError: Jika document_id kosong.
-        RuntimeError: Jika ChromaDB gagal.
+        RuntimeError: Jika ChromaDB gagal (selain "collection not found").
     """
     if not document_id or not document_id.strip():
         raise ValueError("document_id tidak boleh kosong.")
@@ -99,32 +102,17 @@ def get_collection_if_exists(document_id: str) -> Optional[Collection]:
     name = _collection_name(document_id)
 
     try:
-        collections = client.list_collections()
+        return client.get_collection(name)
+    except ValueError:
+        # ChromaDB raises ValueError when collection doesn't exist
+        return None
     except Exception as exc:
+        # Check if it's a "not found" type error
+        if "not found" in str(exc).lower() or "does not exist" in str(exc).lower():
+            return None
         raise RuntimeError(
-            f"Gagal mengambil daftar collection ChromaDB: {exc}"
+            f"Gagal mengambil collection '{name}': {exc}"
         ) from exc
-
-    for item in collections:
-        item_name = None
-        if isinstance(item, Collection):
-            item_name = item.name
-        elif isinstance(item, dict):
-            item_name = item.get("name")
-        elif isinstance(item, str):
-            item_name = item
-
-        if item_name == name:
-            if isinstance(item, Collection):
-                return item
-            try:
-                return client.get_collection(name)
-            except Exception as exc:
-                raise RuntimeError(
-                    f"Gagal mengambil collection '{name}': {exc}"
-                ) from exc
-
-    return None
 
 
 # ---------------------------------------------------------------------------
